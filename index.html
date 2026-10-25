@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Corridor Freight Management</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<style>
+:root{--navy:#141a24;--orange:#c4531f;--bg:#f2f2ef;--card:#fff;--ink:#1b1f27;--muted:#6b7280;--line:#e3e3df;--green:#1f9d55;--ok:#e3f4ea;--okT:#17653a;--warnBg:#fff1d6;--warnT:#8a5a00;--badBg:#fde4e1;--badT:#a12b1d;--lav:#e9e6ff;--lavT:#2d2480}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+header.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:38px;height:38px;border-radius:10px;background:var(--orange);display:grid;place-items:center;flex:none}
+.word{font:700 21px/1 "Barlow Condensed",sans-serif;letter-spacing:.05em}
+.word small{display:block;font:600 11px/1.2 "Barlow Condensed",sans-serif;color:var(--orange);letter-spacing:.16em}
+#topRight{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.pill{font:500 13px "IBM Plex Sans",sans-serif;border:1px solid rgba(255,255,255,.35);color:#fff;background:transparent;border-radius:999px;padding:4px 10px}
+.pill.on{border-color:#4ade80;color:#4ade80}
+main{max-width:520px;margin:0 auto;padding:16px 16px 120px}
+.hero{background:linear-gradient(180deg,#0f141d 0%,#1e2430 55%,#7a3416 100%);color:#fff;border-radius:18px;padding:26px 20px}
+.badge{display:inline-block;border:1px solid #3fbf6f;color:#8ef0b0;background:rgba(31,157,85,.18);font:600 12px "Barlow Condensed",sans-serif;letter-spacing:.14em;padding:5px 10px;border-radius:6px}
+.hero h1{font:700 50px/.95 "Barlow Condensed",sans-serif;color:#fff;margin:16px 0 12px;text-transform:uppercase}
+.hero .accent{color:var(--orange)}
+.hero p{color:#cfd6e0;margin:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.actions{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.eyebrow{font:600 13px "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;color:var(--orange);margin:8px 0 0}
+h1{font:700 40px/1 "Barlow Condensed",sans-serif;margin:6px 0 12px}
+h2{font:700 22px/1.1 "Barlow Condensed",sans-serif;margin:22px 0 8px}
+h3{font:700 26px/1.05 "Barlow Condensed",sans-serif;margin:8px 0 6px}
+p{margin:8px 0}
+.muted{color:var(--muted);font-size:14px}
+.meta{font-size:14px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:10px 0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.auth{padding:18px;margin-top:14px}
+.trip{cursor:pointer}
+.chip{display:inline-block;font:600 13px "IBM Plex Sans",sans-serif;padding:3px 10px;border-radius:999px;background:#eef0f3;color:#3b4350}
+.chip.on_road{background:#e6efff;color:#1e4fa3}
+.chip.at_border{background:#fde7d8;color:#a33e12}
+.chip.delivered{background:var(--ok);color:var(--okT)}
+.chip.cancelled{background:var(--badBg);color:var(--badT)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px}
+.tile b{display:block;font:700 40px/1 "Barlow Condensed",sans-serif}
+.tile span{font-size:13px;color:var(--muted)}
+.seg{display:flex;gap:6px;background:#e9e9e5;border-radius:12px;padding:4px;margin:12px 0}
+.seg button{flex:1;border:0;background:transparent;padding:8px 6px;border-radius:9px;font:600 14px "IBM Plex Sans",sans-serif;color:var(--muted);cursor:pointer}
+.seg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.btn{display:inline-flex;justify-content:center;align-items:center;gap:8px;background:var(--orange);color:#fff;border:0;border-radius:12px;padding:14px 18px;font:600 17px "IBM Plex Sans",sans-serif;cursor:pointer}
+.btn.wide{display:flex;width:100%;margin:12px 0 0}
+.btn.ghost{background:transparent;color:var(--orange);box-shadow:inset 0 0 0 2px var(--orange)}
+.btn.line{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+.btn.danger{background:#b3261e}
+.btn.ghost.danger{background:transparent;color:#b3261e;box-shadow:inset 0 0 0 2px #b3261e}
+.btn:disabled{opacity:.45;cursor:default}
+.hero .btn{background:var(--orange)}
+.link{background:none;border:0;color:var(--orange);font:600 15px "IBM Plex Sans",sans-serif;padding:6px 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.link.danger{color:#b3261e}
+.field{display:block;margin:12px 0}
+.field span{display:block;font-size:14px;color:#374151;margin-bottom:6px}
+.req{color:var(--orange);font-style:normal;margin-left:2px}
+.field em{display:block;color:#b3261e;font-style:normal;font-size:13px;margin-top:4px}
+.ck{display:flex;gap:10px;align-items:center;margin:12px 0;font-size:16px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;font:400 16px "IBM Plex Sans",sans-serif;color:var(--ink)}
+input[type=checkbox]{width:auto}
+input.bad,select.bad{border-color:#b3261e}
+input[type=date]{font-family:"IBM Plex Mono",monospace}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:10px 0}
+.steps i{height:5px;border-radius:3px;background:#d9d9d4}
+.steps i.on{background:var(--orange)}
+.stops .stop{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.stops .stop>span{width:30px;height:30px;border-radius:50%;background:#e7e7e3;display:grid;place-items:center;font-weight:600;flex:none}
+.stop.done>span{background:var(--green);color:#fff}
+.stop.next>span{background:var(--orange);color:#fff}
+.stop small{display:block;color:var(--muted)}
+.switch{border:0;background:#d8d8d3;border-radius:999px;padding:6px 12px;font:600 13px "IBM Plex Sans",sans-serif;cursor:pointer}
+.switch.on{background:var(--green);color:#fff}
+.notice{background:var(--badBg);color:var(--badT);border-radius:10px;padding:10px 12px;margin:10px 0}
+.notice.warn{background:var(--warnBg);color:var(--warnT)}
+.notice.ok{background:var(--ok);color:var(--okT)}
+.item{display:flex;gap:10px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;flex-wrap:wrap}
+.dt{font-size:13px;color:var(--muted);min-width:118px}
+.mono{font:400 12px/1.5 "IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-all}
+.code{font:600 28px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.08em;color:var(--orange)}
+.verdict{border-radius:14px;padding:14px;margin:12px 0;color:#fff}
+.verdict.ok{background:#1d7a4c}
+.verdict.warn{background:#b97c00}
+.verdict.bad{background:#b3261e}
+.verdict p{margin:4px 0;color:#fff}
+#qrbox{display:flex;justify-content:center;background:#fff;padding:12px;border-radius:12px;margin:12px 0}
+.cam{background:#0c0f14;border-radius:14px;overflow:hidden;min-height:150px;margin:10px 0;display:flex;align-items:center;justify-content:center}
+.cam video{width:100%;display:block}
+.invite{display:grid;grid-template-columns:1fr 150px;gap:8px;margin:10px 0}
+nav#tabs{position:fixed;left:0;right:0;bottom:0;z-index:15;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;background:#fff;border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav#tabs[hidden]{display:none}
+nav#tabs button{border:0;background:none;padding:12px 2px 14px;font:600 13px "IBM Plex Sans",sans-serif;color:var(--muted);border-top:3px solid transparent;cursor:pointer}
+nav#tabs button.on{color:var(--orange);border-top-color:var(--orange)}
+#toast{position:fixed;left:14px;right:14px;bottom:calc(76px + env(safe-area-inset-bottom));background:var(--lav);color:var(--lavT);border-radius:12px;padding:12px 14px;font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.12);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none;z-index:50}
+#toast.show{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){#toast{transition:none}}
+@media print{header.top,nav#tabs,#toast,.seg,.btn,.link,.actions{display:none!important}main{max-width:none;padding:0}}
+button.pill{cursor:pointer;font-family:inherit}
+.pill.out{border-color:#fff}
+.rolecard{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;margin:10px 0}
+.rolecard b{display:block;font:700 26px/1.05 "Barlow Condensed",sans-serif}
+.rolecard span{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><path d="M2 6h12v9H2zM15 9h4l3 3v3h-7z"/><circle cx="6" cy="17" r="2"/><circle cx="18" cy="17" r="2"/></svg></span>
+    <span class="word">CORRIDOR<small>FREIGHT MANAGEMENT</small></span>
+  </div>
+  <div id="topRight"></div>
+</header>
+<main id="app"><p class="muted">Connecting…</p></main>
+<nav id="tabs" hidden></nav>
+<div id="toast" role="status" aria-live="polite"></div>
+<script>
+(() => {
+'use strict';
+
+// ---------- constants ----------
+const ROUTES = {
+  'Lusaka to Dar es Salaam': ['Yard, Lusaka', 'Kapiri Mposhi weighbridge', 'Nakonde / Tunduma border', 'Mbeya checkpoint', 'Port of Dar es Salaam'],
+  'Lusaka to Lilongwe': ['Yard, Lusaka', 'Luangwa Bridge checkpoint', 'Chipata weighbridge', 'Mwami / Mchinji border', 'Lilongwe depot'],
+  'Kitwe to Lubumbashi': ['Yard, Kitwe', 'Chingola checkpoint', 'Kasumbalesa border', 'Lubumbashi depot'],
+  'Lusaka to Harare': ['Yard, Lusaka', 'Chirundu border', 'Harare depot'],
+  'Lusaka to Durban': ['Yard, Lusaka', 'Chirundu border', 'Beitbridge border', 'Durban port'],
+  'Lusaka to Gaborone': ['Yard, Lusaka', 'Livingstone checkpoint', 'Kazungula border', 'Gaborone depot']
+};
+const CLEAR = ['Transit (T1)', 'Export', 'Import', 'Certificate of origin (COMESA or SADC)'];
+const DOCS = [['road', 'Road licence'], ['rtsa', 'RTSA fitness certificate'], ['yellow', 'COMESA yellow card'], ['insurance', 'Goods-in-transit insurance'], ['licence', 'Driving licence'], ['medical', 'Medical certificate'], ['passport', 'Passport']];
+const STEPS = ['Truck & driver', 'Cargo & route', 'Clearance & documents', 'Review'];
+const STATUS = { planned: 'Planned', on_road: 'On the road', at_border: 'At a border', delivered: 'Delivered', cancelled: 'Cancelled' };
+const ROLE_NAME = { admin: 'Admin', dispatch: 'Dispatch', driver: 'Driver', border: 'Border officer' };
+const TABS = {
+  admin: [['trips', 'Trips'], ['new', 'New trip'], ['logs', 'Logs'], ['company', 'Companies'], ['scan', 'Scan'], ['control', 'Control']],
+  dispatch: [['trips', 'Trips'], ['new', 'New trip'], ['company', 'Company'], ['logs', 'Logs'], ['scan', 'Scan']],
+  driver: [['trips', 'Trips'], ['new', 'New trip'], ['truck', 'My truck'], ['logs', 'Logs']],
+  border: [['scan', 'Scan'], ['trips', 'Trips'], ['logs', 'Logs']]
+};
+const CAN = {
+  create: ['dispatch'], log: ['dispatch', 'driver', 'admin'], share: ['dispatch', 'driver', 'admin'],
+  costs: ['dispatch'], fleet: ['dispatch'], issue: ['admin'], control: ['admin'], check: ['admin', 'dispatch', 'border']
+};
+const UP = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+// ---------- helpers ----------
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const val = (s) => { const el = $(s); return el ? String(el.value).trim() : ''; };
+const DAY = 864e5;
+const now = () => new Date().toISOString();
+const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const addDays = (s, n) => { const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n); return iso(d); };
+const daysTo = (s) => (s ? Math.round((new Date(s + 'T00:00:00') - today()) / DAY) : null);
+const fmtDate = (s) => (s ? new Date(s + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
+const fmtTime = (s) => (s ? new Date(s).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '');
+const ago = (s) => { if (!s) return ''; const m = Math.round((Date.now() - Date.parse(s)) / 60000); return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`; };
+const up = (s) => String(s || '').trim().toUpperCase();
+const fmtN = (n) => Number(n || 0).toLocaleString('en-GB', { maximumFractionDigits: 1 });
+const ms = (s) => Date.parse(s) || 0;
+const rnd = (n, A) => { let s = ''; for (let i = 0; i < n; i++) s += A[Math.floor(Math.random() * A.length)]; return s; };
+const genCode = () => { const s = rnd(6, UP); return s.slice(0, 3) + '-' + s.slice(3); };
+const newId = (p) => `${p}-${Date.now().toString(36)}${rnd(4, 'abcdefghjkmnpqrstuvwxyz23456789')}`;
+const dStat = (s) => { const d = daysTo(s); return d === null || d < 0 ? 'bad' : d <= 30 ? 'warn' : 'ok'; };
+const worst = (a) => (a.includes('bad') ? 'bad' : a.includes('warn') ? 'warn' : 'ok');
+const symOf = (s) => (s === 'ok' ? '✓' : s === 'warn' ? '!' : '✕');
+const mask = (name) => String(name || '').split(' ').map((w, i) => (i ? w.charAt(0) + '.' : w)).join(' ');
+const maskNrc = (n) => '***' + String(n || '').slice(-4);
+const notice = (t, cls = '') => `<div class="notice ${cls}">${esc(t)}</div>`;
+function sha256js(s) {
+  const K = [], H = []; let p = 2, n = 0;
+  const isP = (x) => { for (let i = 2; i * i <= x; i++) if (x % i === 0) return false; return true; };
+  const fr = (x) => ((x - Math.floor(x)) * 4294967296) | 0;
+  while (n < 64) { if (isP(p)) { if (n < 8) H[n] = fr(Math.pow(p, 0.5)); K[n++] = fr(Math.cbrt(p)); } p++; }
+  const b = Array.from(new TextEncoder().encode(s)), l = b.length * 8;
+  b.push(0x80); while (b.length % 64 !== 56) b.push(0);
+  for (let i = 7; i >= 0; i--) b.push(i > 3 ? 0 : (l >>> (i * 8)) & 255);
+  const rr = (x, k) => (x >>> k) | (x << (32 - k));
+  let st = H.slice();
+  for (let o = 0; o < b.length; o += 64) {
+    const w = [];
+    for (let i = 0; i < 16; i++) w[i] = (b[o + i * 4] << 24) | (b[o + i * 4 + 1] << 16) | (b[o + i * 4 + 2] << 8) | b[o + i * 4 + 3];
+    for (let i = 16; i < 64; i++) { const x = w[i - 15], y = w[i - 2]; w[i] = (w[i - 16] + (rr(x, 7) ^ rr(x, 18) ^ (x >>> 3)) + w[i - 7] + (rr(y, 17) ^ rr(y, 19) ^ (y >>> 10))) | 0; }
+    let [a, bb, c, d, e, f, g, h] = st;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      const t2 = ((rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & bb) ^ (a & c) ^ (bb & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = bb; bb = a; a = (t1 + t2) | 0;
+    }
+    st = [a, bb, c, d, e, f, g, h].map((v, i) => (st[i] + v) | 0);
+  }
+  return st.map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
+async function hashPw(salt, pw) {
+  let h = await sha256(salt + ':' + pw);
+  for (let i = 0; i < 999; i++) h = await sha256(h + salt);
+  return h;
+}
+async function sha256(text) {
+  if (!(window.crypto && crypto.subtle)) return sha256js(text);
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ---------- state ----------
+const S = {
+  db: null, user: null, uid: null, isOwner: false, canWrite: true, ready: false,
+  sys: { open: true }, adminRec: null, accounts: {}, companies: {}, invites: {}, susp: {}, manifests: {}, live: {}, scans: {}, profiles: {}, profPending: {}, trips: [],
+  priv: null, privFor: null,
+  tab: 'trips', cur: null, detailTab: 'track', filter: 'active', q: '',
+  auth: { view: 'home', role: 'dispatch', mode: 'login' }, accLoaded: false, onLanding: false, fb: false, authReady: false, signingUp: false, role0: '', unsubs: [], err: '', flash: '', setupErr: '', loginErr: '', unlinked: false,
+  wiz: { step: 0, data: {}, errors: {} },
+  scan: { stream: null, raf: null, last: null, verdict: null },
+  gps: { on: false, watch: null, last: 0, trip: null },
+  pendingSD: false, busy: false
+};
+const SESSION = 'corridor-session';
+// Paste your Firebase web app config here (Firebase console > Project settings > Your apps).
+// While apiKey is empty the app runs in local-only mode (data stays in this browser).
+const FIREBASE_CONFIG = {
+  apiKey: 'AIzaSyB2CmiIsUYpyB5TktgLlcpfupf6P7PDf_c',
+  authDomain: 'interlane-freight-management.firebaseapp.com',
+  projectId: 'interlane-freight-management',
+  storageBucket: 'interlane-freight-management.firebasestorage.app',
+  messagingSenderId: '67617413858',
+  appId: '1:67617413858:web:4686231599a3ed6410dcbb'
+};
+let fbAuth = null;
+const emailOf = (u) => u + '@corridor.local';
+const fbErr = (e) => ({ 'auth/invalid-credential': 'Wrong username or password.', 'auth/invalid-login-credentials': 'Wrong username or password.', 'auth/wrong-password': 'Wrong username or password.', 'auth/user-not-found': 'Wrong username or password.', 'auth/email-already-in-use': 'That username is taken. Pick another.', 'auth/weak-password': 'Use a password of at least 6 characters.', 'auth/network-request-failed': 'No connection. Check your internet and try again.', 'auth/too-many-requests': 'Too many attempts. Wait a few minutes and try again.', 'auth/operation-not-allowed': 'Email/password sign-in is not switched on in Firebase yet.' }[e && e.code] || (e && e.message) || 'Something went wrong.');
+const AUTH = {
+  admin: { t: 'Admin', h: 'Run the whole system', p: 'Issue and cancel manifests, manage companies and accounts, and shut the system down when needed.' },
+  dispatch: { t: 'Dispatch', h: 'Plan and send trips', p: 'Create trips, give drivers your company code and follow every truck.' },
+  driver: { t: 'Driver', h: 'Your truck, your trip', p: 'Start trips, log checkpoints, share GPS and show your border QR.' },
+  border: { t: 'Border officer', h: 'Check manifests fast', p: 'Scan a QR and see at once if it is valid, edited, fake or cancelled.' }
+};
+const isAdmin = () => !!S.adminRec && S.adminRec.uid === S.uid;
+const me = () => S.accounts[S.uid] || null;
+const myRole = () => (isAdmin() ? 'admin' : (me() && me().role !== 'admin' ? me().role : ''));
+const myCode = () => (me() && me().companyCode) || '';
+const suspUser = () => !!S.susp['user_' + S.uid];
+const suspCo = () => !isAdmin() && !!myCode() && !!S.susp['co_' + myCode()];
+const sysClosed = () => S.sys.open === false && !isAdmin();
+const can = (p) => (CAN[p] || []).includes(myRole());
+const liveFor = (id) => Object.values(S.live).find((l) => l && l.tripId === id) || null;
+const companyName = (code) => { const c = Object.values(S.companies).find((x) => x.code === code); return c ? c.name : ''; };
+function visibleTrips() {
+  const r = myRole();
+  if (r === 'admin' || r === 'border') return S.trips;
+  if (r === 'dispatch') return S.trips.filter((t) => t.companyCode === myCode());
+  if (r === 'driver') return S.trips.filter((t) => t.driverUid === S.uid);
+  return [];
+}
+
+// ---------- local database (this browser only, no server) ----------
+function localDb() {
+  const KEY = 'corridor-freight-db-v2', subs = [];
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } };
+  const save = (d) => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { const x = new Error('Storage is full.'); x.code = 'quota_exceeded'; throw x; } };
+  const clone = (v) => JSON.parse(JSON.stringify(v));
+  const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const snap = (prefix) => {
+    const all = load(), n = prefix.split('/').length + 1;
+    return { docs: Object.keys(all).filter((p) => p.startsWith(prefix + '/') && p.split('/').length === n).sort().map((p) => ({ id: p.split('/')[n - 1], exists: true, data: () => clone(all[p]) })) };
+  };
+  const notify = () => subs.slice().forEach((s) => { try { s.next(snap(s.prefix)); } catch (e) { console.error(e); } });
+  window.addEventListener('storage', (e) => { if (e.key === KEY) notify(); });
+  const mergeDeep = (a, b) => (!isObj(a) || !isObj(b)) ? b : Object.assign({}, a, ...Object.keys(b).map((k) => ({ [k]: mergeDeep(a[k], b[k]) })));
+  const doc = (path) => ({
+    id: path.split('/').pop(),
+    get: async () => { const v = load()[path]; return { id: path.split('/').pop(), exists: v !== undefined, data: () => (v === undefined ? undefined : clone(v)) }; },
+    set: async (data) => { const all = load(); all[path] = clone(data); save(all); notify(); },
+    update: async (data) => { const all = load(); if (all[path] === undefined) throw new Error('Record not found.'); all[path] = mergeDeep(all[path], clone(data)); save(all); notify(); },
+    delete: async () => { const all = load(); delete all[path]; save(all); notify(); }
+  });
+  const collection = (path) => ({
+    onSnapshot: (next) => { const s = { prefix: path, next }; subs.push(s); setTimeout(() => next(snap(path)), 0); return () => subs.splice(subs.indexOf(s), 1); }
+  });
+  return { doc, collection };
+}
+
+function fbDb(fs) {
+  const w = (d) => JSON.parse(JSON.stringify(d));
+  // Offline, Firestore queues the write and only confirms it after reconnecting, so we stop waiting after 3 seconds.
+  const ack = (p) => { p.catch(() => {}); return Promise.race([p, new Promise((res) => setTimeout(res, 3000))]); };
+  const doc = (p) => { const r = fs.doc(p); return { id: r.id, get: () => r.get(), set: (d) => ack(r.set(w(d))), update: (d) => ack(r.update(w(d))), delete: () => ack(r.delete()) }; };
+  const mk = (q) => ({ onSnapshot: (n, e) => q.onSnapshot(n, e), where: (f, o, v) => mk(q.where(f, o, v)) });
+  return { doc, collection: (p) => mk(fs.collection(p)) };
+}
+
+// ---------- shared database ----------
+function listen() {
+  S.unsubs.forEach((f) => f()); S.unsubs = [];
+  const err = (path) => (e) => console.warn('db', path, e && e.code, e && e.message);
+  const byId = (snap) => Object.fromEntries(snap.docs.filter((d) => d.exists).map((d) => [d.id, d.data()]));
+  const on = (name, fn, q) => S.unsubs.push((q || S.db.collection(name)).onSnapshot(fn, err(name)));
+  on('system', (snap) => {
+    S.sys = { open: true }; S.adminRec = null; S.sysExists = false;
+    snap.docs.forEach((d) => {
+      if (!d.exists) return;
+      if (d.id === 'status') { S.sys = d.data() || S.sys; S.sysExists = true; }
+      if (d.id === 'admin') S.adminRec = d.data();
+    });
+    done();
+  });
+  on('accounts', (snap) => { S.accounts = byId(snap); S.accLoaded = true; done(); });
+  on('companies', (snap) => { S.companies = byId(snap); done(); });
+  on('suspensions', (snap) => { S.susp = byId(snap); done(); });
+  on('manifests', (snap) => { S.manifests = byId(snap); done(); });
+  on('live', (snap) => { S.live = byId(snap); done(); });
+  on('trips', (snap) => { S.trips = snap.docs.filter((d) => d.exists).map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)); done(); });
+  const sc = S.db.collection('scans');
+  on('scans', (snap) => { S.scans = byId(snap); done(); }, S.fb && S.role0 !== 'admin' ? sc.where('by', '==', S.uid) : sc);
+}
+function done() {
+  S.ready = true;
+  if (S.uid && S.accLoaded && !S.accounts[S.uid]) { if (S.fb) { logout(); } else { S.uid = null; localStorage.removeItem(SESSION); } }
+  refresh();
+}
+async function loadPriv() {
+  if (!S.uid || S.privFor === S.uid) return;
+  S.privFor = S.uid;
+  try { const d = await S.db.doc(`data/users/${S.uid}/profile`).get(); S.priv = d.exists ? d.data() : {}; }
+  catch (e) { S.priv = {}; }
+  refresh();
+}
+let rTimer = null;
+function refresh() {
+  if (!S.ready) return;
+  if (!me() && !isAdmin() && S.onLanding) return;
+  if (me() && ['new', 'scan', 'control'].includes(S.tab) && !closedNow()) return;
+  clearTimeout(rTimer); rTimer = setTimeout(show, 40);
+}
+function closedNow() { return sysClosed() || suspUser() || suspCo(); }
+async function write(fn, okMsg) {
+  if (!S.canWrite) throw new Error('This page is view-only for you. Ask the owner for Contributor access.');
+  await fn();
+  if (okMsg) toast(okMsg);
+}
+
+// ---------- scaffolding ----------
+function page(html, tabs) {
+  $('#tabs').hidden = !tabs;
+  const f = S.flash ? notice(S.flash, 'ok') : '';
+  S.flash = '';
+  const w = S.canWrite ? '' : notice('This page is view-only for you. Ask the owner for Contributor access to make changes.', 'warn');
+  $('#app').innerHTML = w + f + html;
+}
+function topbar() {
+  const r = myRole(), signed = !!(me() || isAdmin());
+  $('#topRight').innerHTML = `<span class="pill ${navigator.onLine ? 'on' : ''}">${navigator.onLine ? 'Online' : 'Offline'}</span>${r ? `<span class="pill">${esc(ROLE_NAME[r] || r)}</span>` : ''}${signed ? '<button class="pill out" data-act="logout">Log out</button>' : ''}`;
+}
+function renderTabs() {
+  const r = myRole();
+  $('#tabs').innerHTML = (TABS[r] || []).map(([k, l]) => {
+    const on = S.tab === k || (S.tab === 'detail' && k === (r === 'driver' ? 'truck' : 'trips'));
+    return `<button class="${on ? 'on' : ''}" data-act="tab" data-v="${k}">${l}</button>`;
+  }).join('');
+}
+function show() {
+  const wait = (S.fb && !S.authReady) || (!S.ready && !(S.fb && !S.uid)) || (S.fb && S.uid && !S.accLoaded);
+  if (wait) return page('<p class="muted">Loading…</p>', false);
+  topbar();
+  S.onLanding = false;
+  if (!me() && !isAdmin()) return renderAuth();
+  if (sysClosed()) return page(closedHTML('The admin has shut the whole system down for now. Check back later.'), false);
+  if (suspUser()) return page(closedHTML('Your account has been disabled by the admin.'), false);
+  if (suspCo()) return page(closedHTML('The admin has shut down your company for now.'), false);
+  if (myRole() === 'driver' && S.privFor !== S.uid) { loadPriv(); }
+  const r = myRole(), allowed = (TABS[r] || []).map((t) => t[0]);
+  if (!allowed.includes(S.tab) && S.tab !== 'detail') S.tab = allowed[0] || 'trips';
+  renderTabs();
+  if (S.tab === 'detail') page(viewDetail(), true);
+  else {
+    const views = { trips: viewTrips, new: viewWizard, company: viewCompany, logs: viewLogs, scan: viewScan, control: viewControl, truck: viewTruck };
+    page((views[S.tab] || viewTrips)(), true);
+  }
+  afterRender();
+}
+function closedHTML(text) { return `<div class="eyebrow">Closed</div><h1>Shut down</h1><p class="muted">${esc(text)}</p>`; }
+
+// ---------- log in and sign up (one screen per account type) ----------
+function authField(id, label, type, attrs) {
+  return `<label class="field"><span>${esc(label)}</span><input id="${id}" type="${type || 'text'}" ${attrs || ''}></label>`;
+}
+function renderAuth() {
+  S.onLanding = true;
+  $('#tabs').hidden = true; $('#topRight').innerHTML = '';
+  const a = S.auth, flash = S.flash ? notice(S.flash, 'ok') : '';
+  S.err = ''; S.flash = '';
+  if (a.view !== 'role') {
+    $('#app').innerHTML = `<section class="hero"><span class="badge">BUILT FOR ZAMBIAN HAULAGE</span><h1>Every trip,<br><span class="accent">border-ready.</span></h1><p>Corridor Freight Management turns every trip into a QR manifest that border officers can check, and tracks the truck from the yard to the port.</p></section>${flash}
+    <h2>Choose how you use Corridor</h2>${Object.keys(AUTH).map((r) => `<button class="card rolecard" data-act="authRole" data-v="${r}"><b>${esc(AUTH[r].t)}</b><span>${esc(AUTH[r].p)}</span></button>`).join('')}`;
+    return;
+  }
+  const r = a.role, info = AUTH[r], canSign = !(r === 'admin' && S.adminRec), mode = canSign ? a.mode : 'login';
+  const seg = canSign ? `<div class="seg"><button data-act="authMode" data-v="login" class="${mode === 'login' ? 'on' : ''}">Log in</button><button data-act="authMode" data-v="signup" class="${mode === 'signup' ? 'on' : ''}">Sign up</button></div>` : notice('An admin account already exists, so only that admin can log in here.', 'warn');
+  let form;
+  if (mode === 'login') {
+    form = authField('au-user', 'Username', 'text', 'autocomplete="username" autocapitalize="none"') + authField('au-pass', 'Password', 'password', 'autocomplete="current-password"')
+      + `<button class="btn wide" id="authGo" data-act="login">Log in as ${esc(info.t.toLowerCase())}</button>`;
+  } else {
+    const extra = { admin: '', dispatch: authField('su-company', 'Company name'),
+      driver: authField('su-code', 'Company code (from your dispatcher)', 'text', 'placeholder="ABC-123" autocapitalize="characters"') + authField('su-nrc', 'NRC number', 'text', 'placeholder="000000/00/0"') + authField('su-phone', 'Phone', 'tel', 'placeholder="+260 97x xxx xxx"') + authField('su-licence', 'Driving licence number'),
+      border: '<p class="muted">No code needed. Create your account and start scanning.</p>' }[r];
+    form = authField('su-name', 'Full name', 'text', 'autocomplete="name"') + authField('au-user', 'Username', 'text', 'autocomplete="username" autocapitalize="none"')
+      + authField('au-pass', 'Password (6+ characters)', 'password', 'autocomplete="new-password"') + authField('au-pass2', 'Repeat password', 'password', 'autocomplete="new-password"')
+      + extra + `<button class="btn wide" id="authGo" data-act="signup">Create ${esc(info.t.toLowerCase())} account</button>`;
+  }
+  $('#app').innerHTML = `<button class="link" data-act="authHome">All account types</button><div class="eyebrow">${esc(info.t)}</div><h1>${esc(info.h)}</h1><p class="muted">${esc(info.p)}</p>${flash}
+    <section class="card auth">${seg}${form}</section>`;
+}
+function startSession(uid) {
+  S.uid = uid; localStorage.setItem(SESSION, uid);
+  S.tab = 'trips'; S.cur = null; S.q = ''; S.priv = null; S.privFor = null; S.wiz = { step: 0, data: {}, errors: {} };
+}
+function logout() {
+  stopCamera();
+  if (S.gps.on) toggleGps(S.gps.trip);
+  S.uid = null; localStorage.removeItem(SESSION);
+  S.priv = null; S.privFor = null; S.tab = 'trips'; S.cur = null; S.q = '';
+  if (S.fb) {
+    S.unsubs.forEach((f) => f()); S.unsubs = [];
+    Object.assign(S, { accounts: {}, companies: {}, susp: {}, manifests: {}, live: {}, scans: {}, trips: [], profiles: {}, profPending: {}, adminRec: null, accLoaded: false, ready: false, role0: '' });
+    fbAuth.signOut().catch(() => {});
+  }
+  S.auth = { view: 'home', role: 'dispatch', mode: 'login' };
+  S.flash = 'You have logged out.';
+}
+async function startFb(uid) {
+  const d = await S.db.doc('accounts/' + uid).get();
+  if (!d.exists) throw new Error('This login has no Corridor profile.');
+  S.role0 = d.data().role;
+  startSession(uid);
+  listen();
+}
+async function doLogin() {
+  const role = S.auth.role, u = val('#au-user').toLowerCase(), pw = $('#au-pass').value;
+  if (!u || !pw) throw new Error('Enter your username and password.');
+  if (!/^[a-z0-9_.-]{3,30}$/.test(u)) throw new Error('Wrong username or password.');
+  if (S.fb) {
+    S.signingUp = true;
+    try {
+      const c = await fbAuth.signInWithEmailAndPassword(emailOf(u), pw);
+      const d = await S.db.doc('accounts/' + c.user.uid).get();
+      if (!d.exists) throw new Error('This login has no Corridor profile.');
+      const r = d.data().role;
+      if (r !== role) throw new Error(`That is a ${ROLE_NAME[r]} account. Use the ${ROLE_NAME[r]} log in.`);
+      await startFb(c.user.uid);
+    } catch (e) { await fbAuth.signOut().catch(() => {}); throw new Error(e && e.code && String(e.code).startsWith('auth/') ? fbErr(e) : e.message); }
+    finally { S.signingUp = false; }
+    return;
+  }
+  const d = await S.db.doc('creds/' + u).get(), c = d.exists ? d.data() : null;
+  if (!c || (await hashPw(c.salt, pw)) !== c.hash) throw new Error('Wrong username or password.');
+  const acc = S.accounts[c.uid];
+  if (!acc) throw new Error('That account no longer exists.');
+  if (acc.role !== role) throw new Error(`That is a ${ROLE_NAME[acc.role]} account. Use the ${ROLE_NAME[acc.role]} log in.`);
+  startSession(c.uid);
+}
+const codeExists = async (code) => Object.values(S.companies).some((x) => x.code === code) || (await S.db.doc('codes/' + code).get()).exists;
+async function doSignup() {
+  const role = S.auth.role, name = val('#su-name'), user = val('#au-user').toLowerCase(), pw = $('#au-pass').value;
+  if (!name) throw new Error('Enter your full name.');
+  if (!/^[a-z0-9_.-]{3,30}$/.test(user)) throw new Error('Pick a username of 3 to 30 letters, numbers, dots, dashes or underscores.');
+  if (pw.length < 6) throw new Error('Use a password of at least 6 characters.');
+  if (pw !== $('#au-pass2').value) throw new Error('The two passwords do not match.');
+  let uid, created = null;
+  if (S.fb) {
+    S.signingUp = true;
+    try { created = await fbAuth.createUserWithEmailAndPassword(emailOf(user), pw); }
+    catch (e) { S.signingUp = false; throw new Error(fbErr(e)); }
+    uid = created.user.uid;
+  } else {
+    if ((await S.db.doc('creds/' + user).get()).exists) throw new Error('That username is taken. Pick another.');
+    uid = newId('u');
+  }
+  let flash = '';
+  try {
+    const acct = { name, role, username: user, at: now() };
+    let pre = async () => {}, post = async () => {};
+    if (role === 'admin') {
+      if (S.adminRec || (await S.db.doc('system/admin').get()).exists) throw new Error('An admin account is already active. That admin must delete their account first.');
+      pre = async () => { await S.db.doc('system/admin').set({ uid, name, at: now() }); if (!(await S.db.doc('system/status').get()).exists) await S.db.doc('system/status').set({ open: true }); };
+    } else if (role === 'dispatch') {
+      const company = val('#su-company') || name;
+      let code = '';
+      for (let i = 0; i < 8 && !code; i++) { const c = genCode(); if (!(await codeExists(c))) code = c; }
+      if (!code) throw new Error('Could not make a unique company code. Try again.');
+      acct.companyCode = code;
+      post = async () => { await S.db.doc('codes/' + code).set({ uid }); await S.db.doc('companies/' + uid).set({ name: company, code, at: now() }); };
+      flash = `Company created. Your company code is ${code}. Give it to your drivers.`;
+    } else if (role === 'driver') {
+      const code = val('#su-code').toUpperCase().replace(/\s/g, '');
+      if (!(await codeExists(code))) throw new Error('That company code does not match any company. Check it with your dispatcher.');
+      if (S.susp['co_' + code] || (await S.db.doc('suspensions/co_' + code).get()).exists) throw new Error('That company is shut down by the admin right now.');
+      const nrc = val('#su-nrc'), phone = val('#su-phone'), licenceNo = val('#su-licence');
+      if (!/^\d{6}\/\d{2}\/\d$/.test(nrc)) throw new Error('Enter your NRC as 000000/00/0.');
+      if (!/^\+260\d{9}$/.test(phone.replace(/\s/g, ''))) throw new Error('Enter your phone as +260 and nine digits.');
+      if (!licenceNo) throw new Error('Enter your driving licence number.');
+      acct.companyCode = code; acct.phone = phone;
+      post = () => S.db.doc(`data/users/${uid}/profile`).set({ nrc, phone, licenceNo });
+      flash = 'Driver profile created. Your dispatcher can now add you to trips.';
+    } else if (role === 'border') {
+      flash = 'Border officer account created.';
+    }
+    if (!S.fb) { const salt = rnd(16, 'abcdef0123456789'); await S.db.doc('creds/' + user).set({ uid, salt, hash: await hashPw(salt, pw) }); }
+    await pre();
+    await S.db.doc('accounts/' + uid).set(acct);
+    await post();
+  } catch (e) {
+    if (created) { try { await created.user.delete(); } catch (_) {} }
+    throw e;
+  } finally { S.signingUp = false; }
+  if (S.fb) await startFb(uid); else startSession(uid);
+  S.flash = flash;
+}
+
+// ---------- trips list ----------
+function tripCard(t) {
+  const cps = (t.checkpoints || []).length, total = (ROUTES[t.route] || []).length, live = liveFor(t.id);
+  const liveLine = live ? `<div class="meta">Live ${Number(live.lat).toFixed(4)}, ${Number(live.lng).toFixed(4)}, ${ago(live.at)}</div>` : '';
+  return `<article class="card trip" data-act="open" data-id="${esc(t.id)}"><div class="row"><span class="chip ${esc(t.status)}">${esc(STATUS[t.status] || t.status)}</span><span class="mono">${esc(t.id.slice(0, 12))}</span></div><h3>${esc(String(t.route).toUpperCase().replace(' TO ', ' → '))}</h3><div class="meta">${esc(t.truck && t.truck.reg)} · ${esc(t.driver && t.driver.name)} · ${esc(t.cargo && t.cargo.description)}</div><div class="meta">${cps}/${total} checkpoints${t.reference ? ' · Ref ' + esc(t.reference) : ''}</div>${liveLine}</article>`;
+}
+function tripListHTML() {
+  const q = S.q.trim().toLowerCase();
+  const list = visibleTrips().filter((t) => {
+    const f = S.filter, okF = f === 'all' || (f === 'active' ? ['planned', 'on_road', 'at_border'].includes(t.status) : t.status === f);
+    const hay = [t.truck && t.truck.reg, t.driver && t.driver.name, t.reference, t.route, t.companyCode, companyName(t.companyCode)].join(' ').toLowerCase();
+    return okF && (!q || hay.includes(q));
+  });
+  return list.map(tripCard).join('') || '<p class="muted">No trips match this view.</p>';
+}
+function viewTrips() {
+  const list = visibleTrips(), c = (s) => list.filter((t) => t.status === s).length;
+  const eyebrow = myRole() === 'dispatch' ? companyName(myCode()) || 'Your company' : 'Fleet operations';
+  const isBorder = myRole() === 'border';
+  return `<div class="eyebrow">${esc(eyebrow)}</div><h1>Trips</h1>
+  <div class="tiles"><div class="tile"><b>${c('on_road')}</b><span>On the road</span></div><div class="tile"><b>${c('at_border')}</b><span>At a border</span></div><div class="tile"><b>${c('delivered')}</b><span>Delivered</span></div><div class="tile"><b>${c('planned')}</b><span>Planned</span></div></div>
+  ${isBorder ? '' : '<button class="btn wide" data-act="tab" data-v="new">Start a new trip</button>'}
+  ${can('check') ? '<button class="btn ghost wide" data-act="tab" data-v="scan">Scan a QR code</button>' : ''}
+  <div class="seg">${[['active', 'Active'], ['at_border', 'At border'], ['delivered', 'Delivered'], ['all', 'All']].map(([k, l]) => `<button data-act="filter" data-v="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+  <input data-q placeholder="Search truck, driver, ref…" value="${esc(S.q)}" style="margin:6px 0">
+  <div id="tripList">${tripListHTML()}</div>`;
+}
+
+// ---------- new trip ----------
+function startWizard() {
+  const d = {};
+  if (myRole() === 'driver') Object.assign(d, { companyCode: myCode(), driverUid: S.uid, driverName: me().name || '', nrc: (S.priv && S.priv.nrc) || '', phone: (S.priv && S.priv.phone) || me().phone || '', licenceNo: (S.priv && S.priv.licenceNo) || '' });
+  if (myRole() === 'dispatch') d.companyCode = myCode();
+  S.wiz = { step: 0, data: d, errors: {} };
+}
+function validateStep(step) {
+  const d = S.wiz.data, e = {};
+  const req = (k, m) => { if (!String(d[k] ?? '').trim()) e[k] = m || 'Required'; };
+  if (step === 0) {
+    if (myRole() === 'admin') req('companyCode', 'Choose the company');
+    req('driverName'); req('nrc'); req('phone'); req('licenceNo'); req('reg'); req('trailer');
+    if (d.nrc && !/^\d{6}\/\d{2}\/\d$/.test(String(d.nrc).trim())) e.nrc = 'Use the format 000000/00/0';
+    if (d.phone && !/^\+260\d{9}$/.test(String(d.phone).replace(/\s/g, ''))) e.phone = 'Use +260 and nine digits';
+  }
+  if (step === 1) {
+    req('route'); req('cargo'); req('weight');
+    if (!(Number(d.weight) > 0)) e.weight = 'Enter a weight above 0';
+    if (d.dangerous) req('un', 'Enter the UN number');
+  }
+  if (step === 2) {
+    req('departure');
+    DOCS.forEach(([k]) => { req(k); if (d[k] && daysTo(d[k]) < 0) e[k] = 'Expired. Renew before creating the trip.'; });
+  }
+  return e;
+}
+function fld(key, label, type, o = {}) {
+  const d = S.wiz.data, err = (S.wiz.errors || {})[key];
+  if (type === 'check') return `<label class="ck"><input type="checkbox" data-w="${key}"${d[key] ? ' checked' : ''}> ${esc(label)}</label>`;
+  const req = o.req ? '<i class="req">*</i>' : '';
+  const cls = err ? ' class="bad"' : '';
+  const input = type === 'select'
+    ? `<select data-w="${key}"${cls}>${o.options.map(([v, l]) => `<option value="${esc(v)}"${String(d[key] ?? '') === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`
+    : `<input data-w="${key}" type="${type}"${o.ph ? ` placeholder="${esc(o.ph)}"` : ''} value="${esc(d[key] ?? '')}"${cls}>`;
+  return `<label class="field"><span>${esc(label)}${req}</span>${input}${err ? `<em>${esc(err)}</em>` : ''}</label>`;
+}
+function stepHTML(st) {
+  const d = S.wiz.data;
+  if (st === 0) {
+    const drivers = Object.entries(S.accounts).filter(([, a]) => a.role === 'driver' && a.companyCode === d.companyCode);
+    const companies = Object.values(S.companies).map((c) => [c.code, c.name]);
+    return (myRole() === 'admin' ? fld('companyCode', 'Company', 'select', { req: 1, options: [['', 'Choose a company'], ...companies] }) : '')
+      + (myRole() === 'driver' ? '' : fld('driverUid', 'Driver account (if signed up)', 'select', { options: [['', 'Not on the app yet. Type the details below.'], ...drivers.map(([id, a]) => [id, a.name])] }))
+      + fld('driverName', 'Driver full name', 'text', { req: 1 })
+      + fld('nrc', 'NRC number', 'text', { req: 1, ph: '000000/00/0' })
+      + fld('phone', 'Phone', 'tel', { req: 1, ph: '+260 97x xxx xxx' })
+      + fld('licenceNo', 'Driving licence number', 'text', { req: 1 })
+      + fld('reg', 'Truck registration', 'text', { req: 1, ph: 'ABC 1234' })
+      + fld('trailer', 'Trailer registration', 'text', { req: 1, ph: 'ABC 1234' });
+  }
+  if (st === 1) return fld('route', 'Route', 'select', { req: 1, options: Object.keys(ROUTES).map((r) => [r, r]) })
+    + fld('cargo', 'Cargo description', 'text', { req: 1, ph: 'Copper cathodes, Grade A' })
+    + fld('hs', 'HS code', 'text', { ph: '7403.11' })
+    + fld('weight', 'Gross weight (kg)', 'number', { req: 1 })
+    + fld('value', 'Cargo value (USD)', 'number')
+    + fld('dangerous', 'Dangerous goods on board', 'check')
+    + (d.dangerous ? fld('un', 'UN number', 'text', { req: 1, ph: '1830' }) : '');
+  if (st === 2) return fld('departure', 'Departure date', 'date', { req: 1 })
+    + fld('clear', 'Clearance type', 'select', { options: CLEAR.map((c) => [c, c]) })
+    + fld('reference', 'ZRA or ASYCUDA reference (optional)', 'text')
+    + DOCS.map(([k, l]) => fld(k, l + ' expiry', 'date', { req: 1 })).join('');
+  const soon = DOCS.filter(([k]) => d[k] && daysTo(d[k]) >= 0 && daysTo(d[k]) <= 30).map(([, l]) => l);
+  return (soon.length ? notice('Expiring within 30 days: ' + soon.join(', '), 'warn') : '')
+    + `<div class="card"><div class="row"><b>Truck & driver</b><button class="link" data-act="goStep" data-v="0">Edit</button></div><div class="meta">${esc(up(d.reg))} with trailer ${esc(up(d.trailer))}</div><div class="meta">${esc(d.driverName)}, NRC ${esc(d.nrc)}, ${esc(d.phone)}</div></div>`
+    + `<div class="card"><div class="row"><b>Cargo & route</b><button class="link" data-act="goStep" data-v="1">Edit</button></div><div class="meta">${esc(d.route)}</div><div class="meta">${esc(d.cargo)}, ${esc(d.weight)} kg${d.dangerous ? ', dangerous goods UN ' + esc(d.un) : ''}</div></div>`
+    + `<div class="card"><div class="row"><b>Clearance & documents</b><button class="link" data-act="goStep" data-v="2">Edit</button></div><div class="meta">Departs ${fmtDate(d.departure)}, ${esc(d.clear || CLEAR[0])}${d.reference ? ', ref ' + esc(d.reference) : ''}</div></div>`;
+}
+function viewWizard() {
+  const st = S.wiz.step;
+  const bars = STEPS.map((_, i) => `<i class="${i <= st ? 'on' : ''}"></i>`).join('');
+  const foot = st < 3
+    ? `<button class="btn wide" data-act="next">Continue</button>${st ? '<button class="link" data-act="back">Back</button>' : ''}`
+    : '<button class="btn wide" data-act="create">Create trip</button><button class="link" data-act="goStep" data-v="0">Edit from the start</button>';
+  return `<div class="eyebrow">New trip manifest</div><div class="steps">${bars}</div><h1>${STEPS[st]}</h1>${stepHTML(st)}<div style="margin-top:14px">${foot}</div>`;
+}
+async function createTrip() {
+  for (let s = 0; s < 3; s++) {
+    const e = validateStep(s);
+    if (Object.keys(e).length) { S.wiz.step = s; S.wiz.errors = e; S.flash = ''; throw new Error('Fill in the highlighted fields to continue.'); }
+  }
+  const d = S.wiz.data, id = newId('trip');
+  const companyCode = myRole() === 'admin' ? d.companyCode : myCode();
+  const driverUid = myRole() === 'driver' ? S.uid : (d.driverUid || null);
+  const trip = {
+    companyCode, createdBy: S.uid, createdByRole: myRole(), driverUid, status: 'planned', route: d.route,
+    truck: { reg: up(d.reg), trailer: up(d.trailer) },
+    driver: { name: d.driverName.trim(), nrc: d.nrc.trim(), phone: d.phone.trim(), licenceNo: d.licenceNo.trim() },
+    cargo: { description: d.cargo.trim(), hs: String(d.hs || '').trim(), weight: Number(d.weight) || 0, value: Number(d.value) || 0, dangerous: !!d.dangerous, un: d.dangerous ? String(d.un || '').trim() : '' },
+    clearance: d.clear || CLEAR[0], reference: String(d.reference || '').trim(), departure: d.departure,
+    docs: Object.fromEntries(DOCS.map(([k]) => [k, d[k] || ''])),
+    checkpoints: [], events: [{ at: now(), by: me().name, text: 'Trip created' }],
+    createdAt: now(), updatedAt: now()
+  };
+  await write(() => S.db.doc('trips/' + id).set(trip));
+  await issueManifest({ id, ...trip }, 'Trip created. Its QR code is ready.');
+  S.wiz = { step: 0, data: {}, errors: {} };
+  S.cur = id; S.tab = 'detail'; S.detailTab = 'manifest';
+}
+
+// ---------- trip detail, checkpoints, GPS, QR ----------
+function viewDetail() {
+  const t = S.trips.find((x) => x.id === S.cur);
+  if (!t) { S.tab = 'trips'; return viewTrips(); }
+  const stops = ROUTES[t.route] || [], cps = t.checkpoints || [];
+  const mine = myRole() === 'driver' && t.driverUid === S.uid;
+  const canLog = can('log') && (myRole() !== 'driver' || mine);
+  const tabs = `<div class="seg"><button data-act="dtab" data-v="track" class="${S.detailTab === 'track' ? 'on' : ''}">Tracking</button><button data-act="dtab" data-v="manifest" class="${S.detailTab === 'manifest' ? 'on' : ''}">Manifest</button><button data-act="dtab" data-v="details" class="${S.detailTab === 'details' ? 'on' : ''}">Details</button></div>`;
+  const body = S.detailTab === 'manifest' ? manifestPane(t) : S.detailTab === 'details' ? detailsPane(t) : trackPane(t, stops, cps, mine, canLog);
+  const events = (t.events || []).slice(-8).reverse().map((e) => `<div class="item"><span class="dt">${fmtTime(e.at)}</span><span>${esc(e.text)}</span></div>`).join('') || '<p class="muted">Nothing logged yet.</p>';
+  return `<button class="link" data-act="tab" data-v="${myRole() === 'driver' ? 'truck' : 'trips'}">Back</button>
+    <div class="eyebrow">${esc(t.truck && t.truck.reg)} · ${esc(t.clearance)}</div><h1>${esc(String(t.route).toUpperCase().replace(' TO ', ' → '))}</h1>
+    <span class="chip ${esc(t.status)}">${esc(STATUS[t.status] || t.status)}</span>${tabs}${body}<h2>Logged data</h2>${events}`;
+}
+function trackPane(t, stops, cps, mine, canLog) {
+  const live = liveFor(t.id);
+  const gps = `<div class="card"><div class="row"><b>GPS tracking</b>${mine ? `<button class="switch ${S.gps.on ? 'on' : ''}" data-act="gps" data-v="${esc(t.id)}">Auto-track ${S.gps.on ? 'on' : 'off'}</button>` : ''}</div>
+    <p class="meta">${live ? `Last position ${Number(live.lat).toFixed(5)}, ${Number(live.lng).toFixed(5)}, within ${live.acc} m, ${ago(live.at)}.` : 'No position received yet.'}</p>
+    ${live ? `<a class="link" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${Number(live.lat)},${Number(live.lng)}">Open in Google Maps</a>` : ''}
+    ${mine ? '<p class="muted">Position is sent every 30 seconds while this page stays open on your phone.</p>' : ''}</div>`;
+  const next = cps.length;
+  const log = canLog ? `<button class="btn wide" data-act="log" data-v="${esc(t.id)}"${next >= stops.length ? ' disabled' : ''}>${next >= stops.length ? 'Trip delivered' : 'Log checkpoint: ' + esc(stops[next])}</button>` : '';
+  const list = `<div class="eyebrow">Checkpoints ${cps.length}/${stops.length} passed</div><div class="stops">${stops.map((s, i) => {
+    const done = i < cps.length, nx = i === cps.length;
+    return `<div class="stop ${done ? 'done' : nx ? 'next' : ''}"><span>${done ? '✓' : i + 1}</span><div><b>${esc(s)}</b><small>${done ? fmtTime(cps[i].at) : nx ? 'Next stop' : 'Still to come'}</small></div></div>`;
+  }).join('')}</div>`;
+  return gps + log + list;
+}
+function detailsPane(t) {
+  const d = t.driver || {}, c = t.cargo || {}, k = t.truck || {};
+  const row = (l, v) => `<div class="item"><span class="dt">${esc(l)}</span><span>${esc(v === 0 ? '0' : v || '—')}</span></div>`;
+  const cls = { ok: 'delivered', warn: 'at_border', bad: 'cancelled' };
+  const docs = DOCS.map(([key, l]) => { const s = dStat((t.docs || {})[key]); return `<div class="item"><span class="dt">${esc(l)}</span><span>${fmtDate((t.docs || {})[key]) || '—'}</span><span class="chip ${cls[s]}">${s === 'ok' ? 'Valid' : s === 'warn' ? 'Expires soon' : 'Expired or missing'}</span></div>`; }).join('');
+  const creator = S.accounts[t.createdBy];
+  return `<h2>Driver</h2>${row('Name', d.name)}${row('NRC', d.nrc)}${row('Phone', d.phone)}${row('Licence no.', d.licenceNo)}
+    <h2>Truck</h2>${row('Registration', k.reg)}${row('Trailer', k.trailer)}
+    <h2>Cargo</h2>${row('Description', c.description)}${row('HS code', c.hs)}${row('Weight (kg)', fmtN(c.weight))}${row('Value (USD)', fmtN(c.value))}${row('Dangerous goods', c.dangerous ? 'Yes, UN ' + c.un : 'No')}
+    <h2>Trip</h2>${row('Company', companyName(t.companyCode) + ' (' + t.companyCode + ')')}${row('Route', t.route)}${row('Clearance', t.clearance)}${row('Reference', t.reference)}${row('Departure', fmtDate(t.departure))}${row('Created by', creator ? creator.name + ' (' + (ROLE_NAME[creator.role] || creator.role) + ')' : '')}${row('Created', fmtTime(t.createdAt))}
+    <h2>Documents</h2>${docs}`;
+}
+function manifestPane(t) {
+  const m = S.manifests[t.id];
+  const issued = m && m.status === 'valid';
+  const admin = myRole() === 'admin';
+  return `<div class="card"><div class="row"><b>Border QR code</b>${m ? `<span class="chip ${m.status === 'valid' ? 'delivered' : 'cancelled'}">${m.status === 'valid' ? 'Valid' : 'Cancelled'}</span>` : ''}</div>
+    <p class="meta">Border officers check this code against the record Corridor issued. Edited, fake or cancelled codes are flagged.</p>
+    ${can('share') && issued ? '<div id="qrbox"></div>' : ''}
+    ${m ? '' : '<p class="muted">No QR code has been generated for this trip yet.</p>'}
+    ${!can('share') && issued ? '<p class="muted">Manifest issued. The driver can show the QR from this trip.</p>' : ''}
+    <div class="actions">${(admin || (!m && can('share'))) && t.status !== 'cancelled' ? `<button class="btn" data-act="issue" data-v="${esc(t.id)}">${m ? 'Issue a new QR' : 'Generate QR code'}</button>` : ''}
+    ${admin && issued ? `<button class="link danger" data-act="revoke" data-v="${esc(t.id)}">Cancel this manifest</button>` : ''}
+    ${issued ? '<button class="link" data-act="saveqr">Save PNG</button><button class="link" data-act="print">Print</button>' : ''}</div></div>
+    ${m && can('share') ? `<div class="card"><div class="eyebrow">Manifest contents</div><pre class="mono">${esc(m.payload)}</pre></div>` : ''}`;
+}
+async function issueManifest(t, msg) {
+  const n = new Date(), end = Math.max(n.getTime(), t.departure ? Date.parse(t.departure + 'T00:00:00') : 0) + 3 * DAY, payload = JSON.stringify({
+    v: 1, tripId: t.id, companyCode: t.companyCode, route: t.route, reg: t.truck.reg, trailer: t.truck.trailer,
+    driver: mask(t.driver.name), nrc: maskNrc(t.driver.nrc), cargo: t.cargo.description, hs: t.cargo.hs,
+    weight: t.cargo.weight, dg: t.cargo.dangerous ? t.cargo.un : '',
+    issuedAt: n.toISOString(), validUntil: new Date(end).toISOString()
+  });
+  const hash = await sha256(payload);
+  await write(() => S.db.doc('manifests/' + t.id).set({ payload, hash, status: 'valid', issuedAt: n.toISOString(), validUntil: JSON.parse(payload).validUntil, by: S.uid }), msg || 'QR code issued. Show it at the border.');
+}
+async function logCheckpoint(id) {
+  const t = S.trips.find((x) => x.id === id);
+  if (!t) return;
+  const stops = ROUTES[t.route], cps = t.checkpoints || [];
+  if (cps.length >= stops.length) return;
+  const name = stops[cps.length], at = now();
+  const status = cps.length + 1 >= stops.length ? 'delivered' : /border/i.test(name) ? 'at_border' : 'on_road';
+  await write(() => S.db.doc('trips/' + id).update({
+    checkpoints: [...cps, { name, at }],
+    events: [...(t.events || []), { at, by: me() ? me().name : 'Admin', text: 'Checkpoint: ' + name }],
+    status, updatedAt: at
+  }), 'Checkpoint logged: ' + name);
+}
+function toggleGps(id) {
+  if (S.gps.on) {
+    if (S.gps.watch !== null) navigator.geolocation.clearWatch(S.gps.watch);
+    S.gps = { on: false, watch: null, last: 0, trip: null };
+    return;
+  }
+  if (!navigator.geolocation) throw new Error('This browser cannot share GPS here.');
+  S.gps = { on: true, watch: null, last: 0, trip: id };
+  S.gps.watch = navigator.geolocation.watchPosition(
+    (p) => pushGps(p).catch((e) => toast(e.message || 'Could not send position.')),
+    (e) => { S.gps.on = false; toast('GPS: ' + e.message); show(); },
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 30000 }
+  );
+}
+async function pushGps(p) {
+  const n = Date.now();
+  if (n - S.gps.last < 30000 || !S.gps.trip) return;
+  S.gps.last = n;
+  await S.db.doc('live/' + S.uid).set({ tripId: S.gps.trip, lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy || 0), at: now() });
+}
+function viewTruck() {
+  const mine = S.trips.filter((t) => t.driverUid === S.uid);
+  const cur = mine.find((t) => t.status === 'on_road' || t.status === 'at_border') || mine.find((t) => t.status === 'planned');
+  if (!cur) return '<div class="eyebrow">My truck</div><h1>No active trip</h1><p class="muted">Start a trip under New trip. It will show here with GPS tracking, checkpoints and the border QR.</p>';
+  S.cur = cur.id;
+  return viewDetail();
+}
+function makeQR(el, text) {
+  el.innerHTML = '';
+  if (!window.QRCode) { el.innerHTML = '<p class="muted">The QR library did not load. Check your connection.</p>'; return; }
+  new window.QRCode(el, { text, width: 240, height: 240, correctLevel: window.QRCode.CorrectLevel.M });
+}
+function afterRender() {
+  const box = $('#qrbox'), t = S.trips.find((x) => x.id === S.cur);
+  if (box && t && S.manifests[t.id] && S.manifests[t.id].status === 'valid') makeQR(box, JSON.stringify({ id: t.id, p: S.manifests[t.id].payload }));
+  if (S.tab === 'scan') {
+    if (S.scan.stream) { attachCamera(); if (!S.scan.raf) scanLoop(); }
+    showVerdict();
+  }
+}
+
+// ---------- monitoring, company, logs ----------
+function profileFor(id) {
+  if (S.profiles[id] === undefined && !S.profPending[id]) {
+    S.profPending[id] = true;
+    S.db.doc(`data/users/${id}/profile`).get().then((d) => { S.profiles[id] = d.exists ? d.data() : {}; refresh(); }).catch(() => { S.profiles[id] = {}; });
+  }
+  return S.profiles[id] || null;
+}
+function viewCompany() {
+  const code = myCode();
+  if (myRole() === 'admin') {
+    const blocks = Object.entries(S.companies).map(([cid, c]) => {
+      const owner = S.accounts[cid], trips = S.trips.filter((t) => t.companyCode === c.code);
+      const drivers = Object.entries(S.accounts).filter(([, a]) => a.role === 'driver' && a.companyCode === c.code).map(([id, a]) => {
+        const p = profileFor(id) || {}, n = trips.filter((t) => t.driverUid === id).length;
+        return `<div class="item"><div style="flex:1"><b>${esc(a.name)}</b><div class="meta">@${esc(a.username || '')} · ${esc(a.phone || p.phone || '')}</div><div class="meta">NRC ${esc(p.nrc || '…')} · Licence ${esc(p.licenceNo || '…')} · ${n} trip${n === 1 ? '' : 's'}</div></div><span class="chip ${S.susp['user_' + id] ? 'cancelled' : 'delivered'}">${S.susp['user_' + id] ? 'Disabled' : 'Active'}</span></div>`;
+      }).join('') || '<p class="muted">No drivers yet.</p>';
+      const tl = trips.map(tripCard).join('') || '<p class="muted">No trips yet.</p>';
+      return `<div class="card"><div class="row"><div><b style="font:700 24px/1 'Barlow Condensed',sans-serif">${esc(c.name)}</b><div class="meta">Dispatch: ${esc(owner ? owner.name + ' (@' + (owner.username || '') + ')' : '')} · Joined ${fmtDate((c.at || '').slice(0, 10))}</div></div><span class="code" style="font-size:18px">${esc(c.code)}</span></div>
+        <span class="chip ${S.susp['co_' + c.code] ? 'cancelled' : 'delivered'}">${S.susp['co_' + c.code] ? 'Shut down' : 'Open'}</span> <span class="meta">${trips.length} trip${trips.length === 1 ? '' : 's'}</span>
+        <h2>Drivers</h2>${drivers}<h2>Trips</h2>${tl}</div>`;
+    }).join('');
+    const loose = Object.entries(S.accounts).filter(([, a]) => a.role === 'border').map(([id, a]) => `<div class="item"><div style="flex:1"><b>${esc(a.name)}</b><div class="meta">@${esc(a.username || '')} · ${Object.values(S.scans).filter((s) => s.by === id).length} scans</div></div></div>`).join('');
+    return `<div class="eyebrow">Companies</div><h1>All data</h1>${blocks || '<p class="muted">No companies yet.</p>'}<h2>Border officers</h2>${loose || '<p class="muted">No border officers yet.</p>'}`;
+  }
+  const drivers = Object.entries(S.accounts).filter(([, a]) => a.role === 'driver' && a.companyCode === code);
+  const rows = drivers.map(([id, a]) => `<div class="item"><div style="flex:1"><b>${esc(a.name)}</b><div class="meta">${esc(a.phone || '')}</div></div><span class="chip ${S.susp['user_' + id] ? 'cancelled' : 'delivered'}">${S.susp['user_' + id] ? 'Disabled by admin' : 'Active'}</span></div>`).join('');
+  return `<div class="eyebrow">${esc(companyName(code) || 'Your company')}</div><h1>Company</h1>
+    <div class="card"><div class="meta">Company code</div><div class="code">${esc(code)}</div><p class="meta">Drivers enter this code when they sign up. Keep it private.</p></div>
+    <h2>Drivers</h2>${rows || '<p class="muted">No drivers have signed up with this code yet.</p>'}`;
+}
+function scansHTML() {
+  if (!can('check')) return '';
+  const cls = { valid: 'delivered', expired: 'at_border' };
+  const list = Object.entries(S.scans).map(([id, s]) => ({ id, ...s })).filter((s) => myRole() === 'admin' || s.by === S.uid).sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 200);
+  const rows = list.map((s) => { const d = s.details || {}; return `<div class="item"><span class="dt">${fmtTime(s.at)}</span><div style="flex:1;min-width:0"><span class="chip ${cls[s.state] || 'cancelled'}">${esc(s.title)}</span><div class="meta">${esc(d.route || '')}${d.reg ? ' · ' + esc(d.reg) : ''}${d.driver ? ' · ' + esc(d.driver) : ''}</div><div class="meta">Checked by ${esc(s.byName || '')} (${esc(ROLE_NAME[s.role] || s.role || '')})</div><details><summary class="meta">Scanned data</summary><pre class="mono">${esc(s.text || '')}</pre></details></div></div>`; }).join('');
+  return `<h2>${myRole() === 'admin' ? 'All QR checks' : 'Your QR checks'}</h2>${rows || '<p class="muted">No QR codes checked yet.</p>'}<h2>Trip activity</h2>`;
+}
+async function recordScan(r, text, tripId) {
+  try { await S.db.doc('scans/' + newId('scan')).set({ by: S.uid, byName: me() ? me().name : '', role: myRole(), at: now(), state: r.state, title: r.title, tripId: tripId || '', text: String(text).slice(0, 4000), details: r.details || null }); }
+  catch (e) { console.warn('scan not saved', e); }
+}
+function viewLogs() {
+  const rows = [];
+  visibleTrips().forEach((t) => (t.events || []).forEach((e) => rows.push({ at: e.at, text: e.text, by: e.by, route: t.route, reg: t.truck && t.truck.reg, co: t.companyCode })));
+  rows.sort((a, b) => String(b.at).localeCompare(String(a.at)));
+  const scope = myRole() === 'driver' ? 'Your trips' : myRole() === 'dispatch' ? companyName(myCode()) || 'Your company' : 'All companies';
+  const body = rows.slice(0, 200).map((r) => `<div class="item"><span class="dt">${fmtTime(r.at)}</span><div><div>${esc(r.text)}</div><div class="meta">${esc(String(r.route).toUpperCase())} · ${esc(r.reg)} · ${esc(r.by || '')}</div></div></div>`).join('');
+  return `<div class="eyebrow">${esc(scope)}</div><h1>Logs</h1>${scansHTML()}${body || '<p class="muted">No logged data yet.</p>'}`;
+}
+
+// ---------- scanning and verification ----------
+function viewScan() {
+  return `<div class="eyebrow">Border checks</div><h1>Scan a QR</h1>
+  <p class="muted">Point the camera at the QR on the driver’s phone or a printout, or upload a photo of it. Each code is checked against the record Corridor issued.</p>
+  <div class="cam" id="cambox">${S.scan.stream ? '<video id="scan-video" playsinline muted></video>' : '<span class="muted" style="color:#cfd6e0;padding:30px">Camera is off</span>'}</div>
+  <canvas id="scan-canvas" hidden></canvas>
+  <div class="actions"><button class="btn" data-act="camera">${S.scan.stream ? 'Stop camera' : 'Start camera'}</button></div>
+  <label class="field"><span>Upload a photo of the QR</span><input type="file" accept="image/*" id="qr-file"></label>
+  <label class="field"><span>Or paste the QR text</span><textarea id="paste" rows="4"></textarea></label>
+  <button class="btn ghost wide" data-act="verifyPaste">Check pasted text</button>
+  <div id="verdict">${S.scan.verdict ? verdictHTML(S.scan.verdict) : ''}</div>`;
+}
+function attachCamera() {
+  const v = $('#scan-video');
+  if (v && S.scan.stream && v.srcObject !== S.scan.stream) { v.srcObject = S.scan.stream; v.play().catch(() => {}); }
+}
+async function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('The camera is not available here. Upload a photo or paste the text instead.');
+  try { S.scan.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false }); }
+  catch (e) { throw new Error('The camera is blocked in this view. Upload a photo or paste the text instead.'); }
+}
+function stopCamera() {
+  if (S.scan.stream) S.scan.stream.getTracks().forEach((t) => t.stop());
+  S.scan.stream = null;
+  if (S.scan.raf) cancelAnimationFrame(S.scan.raf);
+  S.scan.raf = null; S.scan.last = null;
+}
+function scanLoop() {
+  const v = $('#scan-video'), c = $('#scan-canvas');
+  if (!S.scan.stream || !v || !c || S.tab !== 'scan') { S.scan.raf = null; return; }
+  if (v.readyState >= 2 && window.jsQR && v.videoWidth) {
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(v, 0, 0, c.width, c.height);
+    const code = window.jsQR(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height);
+    if (code && code.data && code.data !== S.scan.last) { S.scan.last = code.data; checkQR(code.data); }
+  }
+  S.scan.raf = requestAnimationFrame(scanLoop);
+}
+function verdictHTML(r) {
+  const d = r.details || {};
+  const cls = { valid: 'ok', expired: 'warn' }[r.state] || 'bad';
+  return `<div class="verdict ${cls}"><b>${esc(r.title)}</b>${(r.reasons || []).map((x) => `<p>${esc(x)}</p>`).join('')}</div>`
+    + (d.route ? `<div class="card"><div class="meta">${esc(d.route)}</div><div class="meta">Truck ${esc(d.reg)} with trailer ${esc(d.trailer)}, driver ${esc(d.driver)}, NRC ${esc(d.nrc)}</div><div class="meta">${esc(d.cargo)}, ${esc(d.weight)} kg${d.dg ? ', dangerous goods UN ' + esc(d.dg) : ''}</div><div class="meta">Valid until ${fmtTime(d.validUntil)}</div></div>` : '');
+}
+function showVerdict() { const box = $('#verdict'); if (box && S.scan.verdict) box.innerHTML = verdictHTML(S.scan.verdict); }
+async function checkQR(text) {
+  let r, tripId = '';
+  try {
+    const o = JSON.parse(text);
+    if (!o || typeof o.id !== 'string' || typeof o.p !== 'string') throw new Error('shape');
+    tripId = o.id;
+    let p = null;
+    try { p = JSON.parse(o.p); } catch (e) { p = null; }
+    let rec;
+    try { const d = await S.db.doc('manifests/' + o.id).get(); rec = d.exists ? d.data() : null; }
+    catch (e) { rec = undefined; }
+    if (rec === undefined) r = { state: 'unknown', title: 'Could not reach the record', reasons: ['Check your connection and scan again.'], details: p };
+    else if (!rec) r = { state: 'fake', title: 'Not issued by Corridor', reasons: ['No manifest with this ID exists. This code is fake or was never issued.'], details: p };
+    else if (rec.payload !== o.p || (await sha256(o.p)) !== rec.hash) r = { state: 'edited', title: 'Edited QR', reasons: ['The contents do not match the manifest Corridor issued. The code was changed.'], details: p };
+    else if (rec.status !== 'valid') r = { state: 'cancelled', title: 'Manifest cancelled', reasons: ['The admin cancelled this manifest.'], details: p };
+    else if (new Date(rec.validUntil) < new Date()) r = { state: 'expired', title: 'Manifest expired', reasons: ['This manifest is past its validity window. Ask for a new QR.'], details: p };
+    else r = { state: 'valid', title: 'Valid manifest', reasons: ['Matches the record Corridor issued.'], details: p };
+  } catch (e) {
+    r = { state: 'fake', title: 'Not a Corridor QR', reasons: ['This code could not be read as a Corridor manifest.'] };
+  }
+  S.scan.verdict = r;
+  showVerdict();
+  recordScan(r, text, tripId);
+}
+
+// ---------- control (admin) ----------
+function viewControl() {
+  const open = S.sys.open !== false;
+  const companies = Object.values(S.companies).map((c) => `<div class="item"><div style="flex:1"><b>${esc(c.name)}</b><div class="meta">Code ${esc(c.code)}</div></div><span class="chip ${S.susp['co_' + c.code] ? 'cancelled' : 'delivered'}">${S.susp['co_' + c.code] ? 'Shut down' : 'Open'}</span><button class="link" data-act="suspendCo" data-v="${esc(c.code)}">${S.susp['co_' + c.code] ? 'Reopen' : 'Shut down'}</button></div>`).join('') || '<p class="muted">No companies yet.</p>';
+  const accounts = Object.entries(S.accounts).filter(([id, a]) => a.role !== 'admin' && id !== S.uid).map(([id, a]) => `<div class="item"><div style="flex:1"><b>${esc(a.name)}</b><div class="meta">${esc(ROLE_NAME[a.role] || a.role)}${a.companyCode ? ' · ' + esc(a.companyCode) : ''}</div></div><button class="link" data-act="suspendUser" data-v="${esc(id)}">${S.susp['user_' + id] ? 'Enable' : 'Disable'}</button></div>`).join('') || '<p class="muted">No other accounts yet.</p>';
+  return `<div class="eyebrow">Admin</div><h1>Control</h1>
+  <div class="card"><div class="row"><b>Whole system</b><span class="chip ${open ? 'delivered' : 'cancelled'}">${open ? 'Open' : 'Shut down'}</span></div>
+    <button class="btn wide ${open ? 'danger' : ''}" data-act="system">${open ? 'Shut down the whole system' : 'Reopen the system'}</button>
+    <p class="meta">While the system is shut down, only the admin can use it.</p></div>
+  <h2>Companies</h2>${companies}
+  <h2>Accounts</h2><p class="muted">Disable an account to block it from signing in to Corridor.</p>${accounts}
+  <h2>Your admin account</h2><p class="muted">Only one admin can be active. Delete your account here before a new admin signs up.</p>
+  <button class="btn ghost danger wide" data-act="deleteAdmin">Delete my admin account</button>`;
+}
+
+// ---------- actions ----------
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('show'), 4200);
+}
+function errText(e) {
+  if (!e) return 'Something went wrong.';
+  if (e.code === 'permission-denied' || e.code === 'invalid_argument') return 'Your account is not allowed to do that.';
+  if (e.code === 'quota_exceeded') return 'The shared storage is full. Remove old data and try again.';
+  if (e.code === 'resource_exhausted') return 'Too many changes at once. Wait a moment and try again.';
+  return e.message || 'Something went wrong. Try again.';
+}
+async function act(a, b) {
+  const id = b.dataset.v;
+  switch (a) {
+    case 'authRole': S.auth = { view: 'role', role: b.dataset.v, mode: 'login' }; S.flash = ''; return;
+    case 'authMode': S.auth.mode = b.dataset.v; return;
+    case 'authHome': S.auth = { view: 'home', role: 'dispatch', mode: 'login' }; S.flash = ''; return;
+    case 'login': return doLogin();
+    case 'signup': return doSignup();
+    case 'logout': logout(); return;
+    case 'tab':
+      if (S.tab === 'scan' && b.dataset.v !== 'scan') stopCamera();
+      S.tab = b.dataset.v; S.q = ''; S.flash = '';
+      if (S.tab === 'new') startWizard();
+      return;
+    case 'open': S.cur = b.dataset.id; S.tab = 'detail'; S.detailTab = 'track'; S.flash = ''; return;
+    case 'dtab': S.detailTab = b.dataset.v; return;
+    case 'filter': S.filter = b.dataset.v; return;
+    case 'next': {
+      const e = validateStep(S.wiz.step); S.wiz.errors = e;
+      if (Object.keys(e).length) throw new Error('Fill in the highlighted fields to continue.');
+      S.wiz.errors = {}; S.wiz.step = Math.min(3, S.wiz.step + 1); return;
+    }
+    case 'back': S.wiz.step = Math.max(0, S.wiz.step - 1); S.wiz.errors = {}; return;
+    case 'goStep': S.wiz.step = Number(b.dataset.v); S.wiz.errors = {}; return;
+    case 'create': return createTrip();
+    case 'log': return logCheckpoint(id);
+    case 'gps': toggleGps(id); return;
+    case 'issue': { const t = S.trips.find((x) => x.id === id); if (t) return issueManifest(t); return; }
+    case 'revoke': return write(() => S.db.doc('manifests/' + id).update({ status: 'revoked' }), 'Manifest cancelled. Border checks will flag it.');
+    case 'saveqr': {
+      const cv = $('#qrbox canvas'), im = $('#qrbox img');
+      const src = cv ? cv.toDataURL('image/png') : (im ? im.src : '');
+      if (!src) throw new Error('Show the QR first.');
+      const link = document.createElement('a'); link.href = src; link.download = 'corridor-manifest-' + S.cur + '.png';
+      document.body.appendChild(link); link.click(); link.remove(); return;
+    }
+    case 'print': window.print(); return;
+    case 'camera':
+      if (S.scan.stream) { stopCamera(); return; }
+      await startCamera(); return;
+    case 'verifyPaste': {
+      const txt = val('#paste');
+      if (!txt) throw new Error('Paste the QR text first.');
+      return checkQR(txt);
+    }
+    case 'system': return write(() => S.db.doc('system/status').set({ open: !(S.sys.open !== false) }), S.sys.open !== false ? 'System shut down. Only the admin can use it now.' : 'System reopened.');
+    case 'suspendCo': {
+      const key = 'co_' + id, on = !!S.susp[key];
+      return write(() => (on ? S.db.doc('suspensions/' + key).delete() : S.db.doc('suspensions/' + key).set({ at: now() })), on ? 'Company reopened.' : 'Company shut down.');
+    }
+    case 'suspendUser': {
+      const key = 'user_' + id, on = !!S.susp[key];
+      return write(() => (on ? S.db.doc('suspensions/' + key).delete() : S.db.doc('suspensions/' + key).set({ at: now() })), on ? 'Account enabled.' : 'Account disabled.');
+    }
+    case 'deleteAdmin': {
+      if (!confirm('Delete your admin account? Nobody can use admin access until a new admin signs up.')) return;
+      await write(() => S.db.doc('system/admin').delete());
+      const un = me() && me().username;
+      if (un && !S.fb) await S.db.doc('creds/' + un).delete();
+      await S.db.doc('accounts/' + S.uid).delete();
+      if (S.fb && fbAuth.currentUser) { try { await fbAuth.currentUser.delete(); } catch (e) { console.warn(e); } }
+      logout();
+      S.flash = 'Admin account deleted. A new admin can now sign up.';
+      return;
+    }
+    default: return;
+  }
+}
+
+// ---------- events ----------
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const a = b.dataset.act;
+  let failed = false;
+  try { await act(a, b); }
+  catch (err) { failed = true; console.error(err); toast(errText(err)); }
+  if (failed && !me() && !isAdmin()) return;
+  show();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.matches('.auth input')) { const g = $('#authGo'); if (g) g.click(); }
+});
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (t.matches('[data-w]') && S.wiz) { S.wiz.data[t.dataset.w] = t.type === 'checkbox' ? t.checked : t.value; return; }
+  if (t.matches('[data-q]')) { S.q = t.value; const list = $('#tripList'); if (list) list.innerHTML = tripListHTML(); }
+});
+document.addEventListener('change', async (e) => {
+  const t = e.target;
+  if (t.id === 'qr-file' && t.files && t.files[0]) {
+    try {
+      const img = new Image();
+      img.src = URL.createObjectURL(t.files[0]);
+      await img.decode();
+      const c = $('#scan-canvas') || document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+      const code = window.jsQR ? window.jsQR(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height) : null;
+      if (code && code.data) await checkQR(code.data);
+      else { S.scan.verdict = { state: 'fake', title: 'No QR found in that photo', reasons: ['Try a sharper photo, or paste the QR text.'] }; showVerdict(); }
+    } catch (err) { toast('Could not read that photo.'); }
+    return;
+  }
+  if (t.matches('[data-w]')) {
+    const k = t.dataset.w;
+    S.wiz.data[k] = t.type === 'checkbox' ? t.checked : t.value;
+    if (k === 'companyCode') { S.wiz.data.driverUid = ''; return show(); }
+    if (k === 'dangerous') return show();
+    if (k === 'driverUid') {
+      const a = S.accounts[t.value];
+      if (a) Object.assign(S.wiz.data, { driverName: a.name || '', phone: a.phone || '' });
+      return show();
+    }
+  }
+});
+window.addEventListener('online', () => { if (S.db) show(); });
+window.addEventListener('offline', () => { if (S.db) show(); });
+
+// ---------- start ----------
+function boot() {
+  S.user = {}; S.canWrite = true;
+  if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sw', e));
+  if (FIREBASE_CONFIG.apiKey && window.firebase) {
+    S.fb = true;
+    firebase.initializeApp(FIREBASE_CONFIG);
+    fbAuth = firebase.auth();
+    const fs = firebase.firestore();
+    fs.enablePersistence({ synchronizeTabs: true }).catch((e) => console.warn('Offline cache not available:', e.code));
+    S.db = fbDb(fs);
+    fbAuth.onAuthStateChanged(async (u) => {
+      if (S.signingUp) return;
+      S.authReady = true;
+      if (u && !S.uid) { try { await startFb(u.uid); } catch (e) { await fbAuth.signOut().catch(() => {}); } }
+      show();
+    });
+    show();
+    return;
+  }
+  try { localStorage.setItem('corridor-test', '1'); localStorage.removeItem('corridor-test'); }
+  catch (e) { return page(notice('This browser is blocking site storage, so Corridor cannot save anything. Allow site data and reload.'), false); }
+  S.db = localDb();
+  S.uid = localStorage.getItem(SESSION) || null;
+  listen();
+  show();
+}
+boot();
+})();
+</script>
+</body>
+</html>
