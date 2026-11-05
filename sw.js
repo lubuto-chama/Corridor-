@@ -1,7 +1,11 @@
 // Corridor Freight: caches the app so it opens with no connection.
-const CACHE = 'corridor-v1';
+const CACHE = 'corridor-v2';
 const PRECACHE = [
   './',
+  'manifest.webmanifest',
+  'icon-192.png',
+  'icon-512.png',
+  'apple-touch-icon.png',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js',
@@ -12,7 +16,7 @@ const PRECACHE = [
 const HOSTS = ['www.gstatic.com', 'fonts.gstatic.com', 'fonts.googleapis.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(PRECACHE.map((u) => c.add(new Request(u, { mode: u.startsWith('.') ? 'same-origin' : 'no-cors' })).catch(() => {})))).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then((c) => Promise.all(PRECACHE.map((u) => c.add(new Request(u, { mode: u.startsWith('http') ? 'no-cors' : 'same-origin' })).catch(() => {})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim()));

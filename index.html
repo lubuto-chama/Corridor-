@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Corridor Freight Management</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#141a24">
+<meta name="description" content="Digital trip manifests and QR checks for cross-border freight in Zambia.">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Corridor">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -23,7 +30,8 @@ header.top{position:sticky;top:0;z-index:20;background:var(--navy);color:#fff;di
 #topRight{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .pill{font:500 13px "IBM Plex Sans",sans-serif;border:1px solid rgba(255,255,255,.35);color:#fff;background:transparent;border-radius:999px;padding:4px 10px}
 .pill.on{border-color:#4ade80;color:#4ade80}
-main{max-width:520px;margin:0 auto;padding:16px 16px 120px}
+main{max-width:520px;margin:0 auto;padding:16px 16px 24px}
+#foot{max-width:520px;margin:0 auto;padding:8px 16px 96px;text-align:center;color:var(--muted);font-size:13px}#foot .link{font-size:13px;padding:2px 4px}
 .hero{background:linear-gradient(180deg,#0f141d 0%,#1e2430 55%,#7a3416 100%);color:#fff;border-radius:18px;padding:26px 20px}
 .badge{display:inline-block;border:1px solid #3fbf6f;color:#8ef0b0;background:rgba(31,157,85,.18);font:600 12px "Barlow Condensed",sans-serif;letter-spacing:.14em;padding:5px 10px;border-radius:6px}
 .hero h1{font:700 50px/.95 "Barlow Condensed",sans-serif;color:#fff;margin:16px 0 12px;text-transform:uppercase}
@@ -105,12 +113,13 @@ nav#tabs button.on{color:var(--orange);border-top-color:var(--orange)}
 #toast{position:fixed;left:14px;right:14px;bottom:calc(76px + env(safe-area-inset-bottom));background:var(--lav);color:var(--lavT);border-radius:12px;padding:12px 14px;font-weight:500;box-shadow:0 6px 20px rgba(0,0,0,.12);opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none;z-index:50}
 #toast.show{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){#toast{transition:none}}
-@media print{header.top,nav#tabs,#toast,.seg,.btn,.link,.actions{display:none!important}main{max-width:none;padding:0}}
+@media print{#foot,header.top,nav#tabs,#toast,.seg,.btn,.link,.actions{display:none!important}main{max-width:none;padding:0}}
 button.pill{cursor:pointer;font-family:inherit}
 .pill.out{border-color:#fff}
 .rolecard{display:block;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;margin:10px 0}
 .rolecard b{display:block;font:700 26px/1.05 "Barlow Condensed",sans-serif}
 .rolecard span{color:var(--muted);font-size:14px}
+.qrframe{border:3px dashed var(--orange);border-radius:16px;padding:12px;margin:12px 0;text-align:center}.qrframe #qrbox{margin:0 0 8px}.qrframe small{display:block;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -122,6 +131,7 @@ button.pill{cursor:pointer;font-family:inherit}
   <div id="topRight"></div>
 </header>
 <main id="app"><p class="muted">Connecting…</p></main>
+<footer id="foot"><div>&copy; <span id="yr"></span> Corridor Freight Management &middot; v1.0</div><div><button class="link" data-act="info" data-v="about">About</button> &middot; <button class="link" data-act="info" data-v="contact">Contact</button> &middot; <button class="link" data-act="info" data-v="privacy">Privacy</button></div></footer>
 <nav id="tabs" hidden></nav>
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
@@ -144,8 +154,8 @@ const STATUS = { planned: 'Planned', on_road: 'On the road', at_border: 'At a bo
 const ROLE_NAME = { admin: 'Admin', dispatch: 'Dispatch', driver: 'Driver', border: 'Border officer' };
 const TABS = {
   admin: [['trips', 'Trips'], ['new', 'New trip'], ['logs', 'Logs'], ['company', 'Companies'], ['scan', 'Scan'], ['control', 'Control']],
-  dispatch: [['trips', 'Trips'], ['new', 'New trip'], ['company', 'Company'], ['logs', 'Logs'], ['scan', 'Scan']],
-  driver: [['trips', 'Trips'], ['new', 'New trip'], ['truck', 'My truck'], ['logs', 'Logs']],
+  dispatch: [['trips', 'Trips'], ['new', 'New trip'], ['loads', 'Loads'], ['company', 'Company'], ['logs', 'Logs'], ['scan', 'Scan']],
+  driver: [['trips', 'Trips'], ['new', 'New trip'], ['truck', 'My truck'], ['loads', 'Loads'], ['logs', 'Logs']],
   border: [['scan', 'Scan'], ['trips', 'Trips'], ['logs', 'Logs']]
 };
 const CAN = {
@@ -217,7 +227,7 @@ async function sha256(text) {
 // ---------- state ----------
 const S = {
   db: null, user: null, uid: null, isOwner: false, canWrite: true, ready: false,
-  sys: { open: true }, adminRec: null, accounts: {}, companies: {}, invites: {}, susp: {}, manifests: {}, live: {}, scans: {}, profiles: {}, profPending: {}, trips: [],
+  sys: { open: true }, adminRec: null, accounts: {}, companies: {}, invites: {}, susp: {}, manifests: {}, live: {}, scans: {}, loads: {}, profiles: {}, profPending: {}, trips: [],
   priv: null, privFor: null,
   tab: 'trips', cur: null, detailTab: 'track', filter: 'active', q: '',
   auth: { view: 'home', role: 'dispatch', mode: 'login' }, accLoaded: false, onLanding: false, fb: false, authReady: false, signingUp: false, role0: '', unsubs: [], err: '', flash: '', setupErr: '', loginErr: '', unlinked: false,
@@ -321,6 +331,7 @@ function listen() {
   on('manifests', (snap) => { S.manifests = byId(snap); done(); });
   on('live', (snap) => { S.live = byId(snap); done(); });
   on('trips', (snap) => { S.trips = snap.docs.filter((d) => d.exists).map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)); done(); });
+  on('loads', (snap) => { S.loads = byId(snap); done(); });
   const sc = S.db.collection('scans');
   on('scans', (snap) => { S.scans = byId(snap); done(); }, S.fb && S.role0 !== 'admin' ? sc.where('by', '==', S.uid) : sc);
 }
@@ -341,6 +352,8 @@ function refresh() {
   if (!S.ready) return;
   if (!me() && !isAdmin() && S.onLanding) return;
   if (me() && ['new', 'scan', 'control'].includes(S.tab) && !closedNow()) return;
+  const ae = document.activeElement;
+  if (me() && !closedNow() && (($('#sig')) || (ae && ae.matches && ae.matches('#app input, #app textarea, #app select')))) return;
   clearTimeout(rTimer); rTimer = setTimeout(show, 40);
 }
 function closedNow() { return sysClosed() || suspUser() || suspCo(); }
@@ -374,6 +387,7 @@ function show() {
   if (wait) return page('<p class="muted">Loading…</p>', false);
   topbar();
   S.onLanding = false;
+  if (S.info) return page(infoHTML(S.info), false);
   if (!me() && !isAdmin()) return renderAuth();
   if (sysClosed()) return page(closedHTML('The admin has shut the whole system down for now. Check back later.'), false);
   if (suspUser()) return page(closedHTML('Your account has been disabled by the admin.'), false);
@@ -384,7 +398,7 @@ function show() {
   renderTabs();
   if (S.tab === 'detail') page(viewDetail(), true);
   else {
-    const views = { trips: viewTrips, new: viewWizard, company: viewCompany, logs: viewLogs, scan: viewScan, control: viewControl, truck: viewTruck };
+    const views = { loads: viewLoads, trips: viewTrips, new: viewWizard, company: viewCompany, logs: viewLogs, scan: viewScan, control: viewControl, truck: viewTruck };
     page((views[S.tab] || viewTrips)(), true);
   }
   afterRender();
@@ -413,11 +427,11 @@ function renderAuth() {
       + `<button class="btn wide" id="authGo" data-act="login">Log in as ${esc(info.t.toLowerCase())}</button>`;
   } else {
     const extra = { admin: '', dispatch: authField('su-company', 'Company name'),
-      driver: authField('su-code', 'Company code (from your dispatcher)', 'text', 'placeholder="ABC-123" autocapitalize="characters"') + authField('su-nrc', 'NRC number', 'text', 'placeholder="000000/00/0"') + authField('su-phone', 'Phone', 'tel', 'placeholder="+260 97x xxx xxx"') + authField('su-licence', 'Driving licence number'),
+      driver: authField('su-code', 'Company code (from your dispatcher)', 'text', 'placeholder="ABC-123" autocapitalize="characters"') + authField('su-nrc', 'NRC number', 'text', 'placeholder="000000/00/0" inputmode="numeric" data-fmt="nrc"') + authField('su-phone', 'Phone', 'tel', 'placeholder="+260 97 123 4567" data-fmt="phone"') + authField('su-licence', 'Driving licence number', 'text', 'data-fmt="licence" autocapitalize="characters"') + authField('su-passport', 'Passport number', 'text', 'data-fmt="passport" autocapitalize="characters"'),
       border: '<p class="muted">No code needed. Create your account and start scanning.</p>' }[r];
     form = authField('su-name', 'Full name', 'text', 'autocomplete="name"') + authField('au-user', 'Username', 'text', 'autocomplete="username" autocapitalize="none"')
       + authField('au-pass', 'Password (6+ characters)', 'password', 'autocomplete="new-password"') + authField('au-pass2', 'Repeat password', 'password', 'autocomplete="new-password"')
-      + extra + `<button class="btn wide" id="authGo" data-act="signup">Create ${esc(info.t.toLowerCase())} account</button>`;
+      + extra + '<p class="muted">By creating an account you agree to the privacy notice (link at the bottom of the page).</p>' + `<button class="btn wide" id="authGo" data-act="signup">Create ${esc(info.t.toLowerCase())} account</button>`;
   }
   $('#app').innerHTML = `<button class="link" data-act="authHome">All account types</button><div class="eyebrow">${esc(info.t)}</div><h1>${esc(info.h)}</h1><p class="muted">${esc(info.p)}</p>${flash}
     <section class="card auth">${seg}${form}</section>`;
@@ -433,7 +447,7 @@ function logout() {
   S.priv = null; S.privFor = null; S.tab = 'trips'; S.cur = null; S.q = '';
   if (S.fb) {
     S.unsubs.forEach((f) => f()); S.unsubs = [];
-    Object.assign(S, { accounts: {}, companies: {}, susp: {}, manifests: {}, live: {}, scans: {}, trips: [], profiles: {}, profPending: {}, adminRec: null, accLoaded: false, ready: false, role0: '' });
+    Object.assign(S, { accounts: {}, companies: {}, susp: {}, manifests: {}, live: {}, scans: {}, loads: {}, trips: [], profiles: {}, profPending: {}, adminRec: null, accLoaded: false, ready: false, role0: '' });
     fbAuth.signOut().catch(() => {});
   }
   S.auth = { view: 'home', role: 'dispatch', mode: 'login' };
@@ -506,12 +520,13 @@ async function doSignup() {
       const code = val('#su-code').toUpperCase().replace(/\s/g, '');
       if (!(await codeExists(code))) throw new Error('That company code does not match any company. Check it with your dispatcher.');
       if (S.susp['co_' + code] || (await S.db.doc('suspensions/co_' + code).get()).exists) throw new Error('That company is shut down by the admin right now.');
-      const nrc = val('#su-nrc'), phone = val('#su-phone'), licenceNo = val('#su-licence');
+      const nrc = val('#su-nrc'), phone = val('#su-phone'), licenceNo = val('#su-licence'), passportNo = val('#su-passport');
       if (!/^\d{6}\/\d{2}\/\d$/.test(nrc)) throw new Error('Enter your NRC as 000000/00/0.');
       if (!/^\+260\d{9}$/.test(phone.replace(/\s/g, ''))) throw new Error('Enter your phone as +260 and nine digits.');
-      if (!licenceNo) throw new Error('Enter your driving licence number.');
+      if (!OK.licence.test(licenceNo)) throw new Error('Enter your driving licence number (5 to 20 letters, numbers, / or -).');
+      if (!OK.passport.test(passportNo)) throw new Error('Enter your passport number (6 to 9 letters or numbers).');
       acct.companyCode = code; acct.phone = phone;
-      post = () => S.db.doc(`data/users/${uid}/profile`).set({ nrc, phone, licenceNo });
+      post = () => S.db.doc(`data/users/${uid}/profile`).set({ nrc, phone, licenceNo, passportNo });
       flash = 'Driver profile created. Your dispatcher can now add you to trips.';
     } else if (role === 'border') {
       flash = 'Border officer account created.';
@@ -559,7 +574,7 @@ function viewTrips() {
 // ---------- new trip ----------
 function startWizard() {
   const d = {};
-  if (myRole() === 'driver') Object.assign(d, { companyCode: myCode(), driverUid: S.uid, driverName: me().name || '', nrc: (S.priv && S.priv.nrc) || '', phone: (S.priv && S.priv.phone) || me().phone || '', licenceNo: (S.priv && S.priv.licenceNo) || '' });
+  if (myRole() === 'driver') Object.assign(d, { companyCode: myCode(), driverUid: S.uid, driverName: me().name || '', nrc: (S.priv && S.priv.nrc) || '', phone: (S.priv && S.priv.phone) || me().phone || '', licenceNo: (S.priv && S.priv.licenceNo) || '', passportNo: (S.priv && S.priv.passportNo) || '' });
   if (myRole() === 'dispatch') d.companyCode = myCode();
   S.wiz = { step: 0, data: d, errors: {} };
 }
@@ -568,12 +583,19 @@ function validateStep(step) {
   const req = (k, m) => { if (!String(d[k] ?? '').trim()) e[k] = m || 'Required'; };
   if (step === 0) {
     if (myRole() === 'admin') req('companyCode', 'Choose the company');
-    req('driverName'); req('nrc'); req('phone'); req('licenceNo'); req('reg'); req('trailer');
+    req('driverName'); req('nrc'); req('phone'); req('licenceNo'); req('passportNo'); req('reg'); req('trailer');
+    d.licenceNo = FMT.licence(d.licenceNo || ''); d.passportNo = FMT.passport(d.passportNo || ''); d.reg = FMT.plate(d.reg || ''); d.trailer = FMT.plate(d.trailer || '');
+    if (d.licenceNo && !OK.licence.test(d.licenceNo)) e.licenceNo = 'Use 5 to 20 letters, numbers, / or -';
+    if (d.passportNo && !OK.passport.test(d.passportNo)) e.passportNo = 'Use 6 to 9 letters or numbers';
+    if (d.reg && !OK.plate.test(d.reg)) e.reg = 'Use letters then numbers, like ABC 1234';
+    if (d.trailer && !OK.plate.test(d.trailer)) e.trailer = 'Use letters then numbers, like ABC 1234';
     if (d.nrc && !/^\d{6}\/\d{2}\/\d$/.test(String(d.nrc).trim())) e.nrc = 'Use the format 000000/00/0';
     if (d.phone && !/^\+260\d{9}$/.test(String(d.phone).replace(/\s/g, ''))) e.phone = 'Use +260 and nine digits';
   }
   if (step === 1) {
-    req('route'); req('cargo'); req('weight');
+    req('route');
+    if (d.cargoSel === 'Other') { d.cargo = String(d.cargoOther || '').trim(); req('cargoOther', 'Describe the cargo'); } else { d.cargo = d.cargoSel || ''; req('cargoSel', 'Choose the cargo type'); }
+    req('weight');
     if (!(Number(d.weight) > 0)) e.weight = 'Enter a weight above 0';
     if (d.dangerous) req('un', 'Enter the UN number');
   }
@@ -590,8 +612,14 @@ function fld(key, label, type, o = {}) {
   const cls = err ? ' class="bad"' : '';
   const input = type === 'select'
     ? `<select data-w="${key}"${cls}>${o.options.map(([v, l]) => `<option value="${esc(v)}"${String(d[key] ?? '') === String(v) ? ' selected' : ''}>${esc(l)}</option>`).join('')}</select>`
-    : `<input data-w="${key}" type="${type}"${o.ph ? ` placeholder="${esc(o.ph)}"` : ''} value="${esc(d[key] ?? '')}"${cls}>`;
+    : `<input data-w="${key}" type="${type}"${o.fmt ? ` data-fmt="${o.fmt}"` : ''}${o.fmt === 'plate' || o.fmt === 'licence' || o.fmt === 'passport' ? ' autocapitalize="characters"' : ''}${o.ph ? ` placeholder="${esc(o.ph)}"` : ''} value="${esc(d[key] ?? '')}"${cls}>`;
   return `<label class="field"><span>${esc(label)}${req}</span>${input}${err ? `<em>${esc(err)}</em>` : ''}</label>`;
+}
+function cargoField(d) {
+  const e = S.wiz.errors || {}, bad = (k) => (e[k] ? ' class="bad"' : ''), em = (k) => (e[k] ? `<em>${esc(e[k])}</em>` : '');
+  const sel = `<label class="field"><span>Cargo type<i class="req">*</i></span><select data-w="cargoSel"${bad('cargoSel')}><option value="">Choose cargo type</option>${CARGO.map(([g, items]) => `<optgroup label="${esc(g)}">${items.map(([n]) => `<option${d.cargoSel === n ? ' selected' : ''}>${esc(n)}</option>`).join('')}</optgroup>`).join('')}<option value="Other"${d.cargoSel === 'Other' ? ' selected' : ''}>Other (type it in)</option></select>${em('cargoSel')}</label>`;
+  const other = d.cargoSel === 'Other' ? `<label class="field"><span>Describe the cargo<i class="req">*</i></span><input data-w="cargoOther" type="text" value="${esc(d.cargoOther || '')}" placeholder="What is on the truck?"${bad('cargoOther')}>${em('cargoOther')}</label>` : '';
+  return sel + other;
 }
 function stepHTML(st) {
   const d = S.wiz.data;
@@ -601,15 +629,16 @@ function stepHTML(st) {
     return (myRole() === 'admin' ? fld('companyCode', 'Company', 'select', { req: 1, options: [['', 'Choose a company'], ...companies] }) : '')
       + (myRole() === 'driver' ? '' : fld('driverUid', 'Driver account (if signed up)', 'select', { options: [['', 'Not on the app yet. Type the details below.'], ...drivers.map(([id, a]) => [id, a.name])] }))
       + fld('driverName', 'Driver full name', 'text', { req: 1 })
-      + fld('nrc', 'NRC number', 'text', { req: 1, ph: '000000/00/0' })
-      + fld('phone', 'Phone', 'tel', { req: 1, ph: '+260 97x xxx xxx' })
-      + fld('licenceNo', 'Driving licence number', 'text', { req: 1 })
-      + fld('reg', 'Truck registration', 'text', { req: 1, ph: 'ABC 1234' })
-      + fld('trailer', 'Trailer registration', 'text', { req: 1, ph: 'ABC 1234' });
+      + fld('nrc', 'NRC number', 'text', { req: 1, ph: '000000/00/0', fmt: 'nrc' })
+      + fld('phone', 'Phone', 'tel', { req: 1, ph: '+260 97 123 4567', fmt: 'phone' })
+      + fld('licenceNo', 'Driving licence number', 'text', { req: 1, fmt: 'licence' })
+      + fld('passportNo', 'Passport number', 'text', { req: 1, fmt: 'passport' })
+      + fld('reg', 'Truck registration', 'text', { req: 1, ph: 'ABC 1234', fmt: 'plate' })
+      + fld('trailer', 'Trailer registration', 'text', { req: 1, ph: 'ABC 1234', fmt: 'plate' });
   }
   if (st === 1) return fld('route', 'Route', 'select', { req: 1, options: Object.keys(ROUTES).map((r) => [r, r]) })
-    + fld('cargo', 'Cargo description', 'text', { req: 1, ph: 'Copper cathodes, Grade A' })
-    + fld('hs', 'HS code', 'text', { ph: '7403.11' })
+    + cargoField(d)
+    + fld('hs', 'HS code (suggested, confirm with your clearing agent)', 'text', { ph: '7403.11' })
     + fld('weight', 'Gross weight (kg)', 'number', { req: 1 })
     + fld('value', 'Cargo value (USD)', 'number')
     + fld('dangerous', 'Dangerous goods on board', 'check')
@@ -643,7 +672,7 @@ async function createTrip() {
   const trip = {
     companyCode, createdBy: S.uid, createdByRole: myRole(), driverUid, status: 'planned', route: d.route,
     truck: { reg: up(d.reg), trailer: up(d.trailer) },
-    driver: { name: d.driverName.trim(), nrc: d.nrc.trim(), phone: d.phone.trim(), licenceNo: d.licenceNo.trim() },
+    driver: { name: d.driverName.trim(), nrc: d.nrc.trim(), phone: d.phone.trim(), licenceNo: d.licenceNo.trim(), passportNo: String(d.passportNo || '').trim() },
     cargo: { description: d.cargo.trim(), hs: String(d.hs || '').trim(), weight: Number(d.weight) || 0, value: Number(d.value) || 0, dangerous: !!d.dangerous, un: d.dangerous ? String(d.un || '').trim() : '' },
     clearance: d.clear || CLEAR[0], reference: String(d.reference || '').trim(), departure: d.departure,
     docs: Object.fromEntries(DOCS.map(([k]) => [k, d[k] || ''])),
@@ -663,8 +692,8 @@ function viewDetail() {
   const stops = ROUTES[t.route] || [], cps = t.checkpoints || [];
   const mine = myRole() === 'driver' && t.driverUid === S.uid;
   const canLog = can('log') && (myRole() !== 'driver' || mine);
-  const tabs = `<div class="seg"><button data-act="dtab" data-v="track" class="${S.detailTab === 'track' ? 'on' : ''}">Tracking</button><button data-act="dtab" data-v="manifest" class="${S.detailTab === 'manifest' ? 'on' : ''}">Manifest</button><button data-act="dtab" data-v="details" class="${S.detailTab === 'details' ? 'on' : ''}">Details</button></div>`;
-  const body = S.detailTab === 'manifest' ? manifestPane(t) : S.detailTab === 'details' ? detailsPane(t) : trackPane(t, stops, cps, mine, canLog);
+  const tabs = `<div class="seg"><button data-act="dtab" data-v="track" class="${S.detailTab === 'track' ? 'on' : ''}">Tracking</button><button data-act="dtab" data-v="manifest" class="${S.detailTab === 'manifest' ? 'on' : ''}">Manifest</button><button data-act="dtab" data-v="details" class="${S.detailTab === 'details' ? 'on' : ''}">Details</button><button data-act="dtab" data-v="docs" class="${S.detailTab === 'docs' ? 'on' : ''}">Documents</button></div>`;
+  const body = S.detailTab === 'manifest' ? manifestPane(t) : S.detailTab === 'details' ? detailsPane(t) : S.detailTab === 'docs' ? docsPane(t) : trackPane(t, stops, cps, mine, canLog);
   const events = (t.events || []).slice(-8).reverse().map((e) => `<div class="item"><span class="dt">${fmtTime(e.at)}</span><span>${esc(e.text)}</span></div>`).join('') || '<p class="muted">Nothing logged yet.</p>';
   return `<button class="link" data-act="tab" data-v="${myRole() === 'driver' ? 'truck' : 'trips'}">Back</button>
     <div class="eyebrow">${esc(t.truck && t.truck.reg)} · ${esc(t.clearance)}</div><h1>${esc(String(t.route).toUpperCase().replace(' TO ', ' → '))}</h1>
@@ -682,7 +711,8 @@ function trackPane(t, stops, cps, mine, canLog) {
     const done = i < cps.length, nx = i === cps.length;
     return `<div class="stop ${done ? 'done' : nx ? 'next' : ''}"><span>${done ? '✓' : i + 1}</span><div><b>${esc(s)}</b><small>${done ? fmtTime(cps[i].at) : nx ? 'Next stop' : 'Still to come'}</small></div></div>`;
   }).join('')}</div>`;
-  return gps + log + list;
+  const share = can('share') ? `<button class="btn wide line" data-act="shareStatus" data-v="${esc(t.id)}">Send status to customer on WhatsApp</button>` : '';
+  return gps + share + log + podPane(t, canLog) + list;
 }
 function detailsPane(t) {
   const d = t.driver || {}, c = t.cargo || {}, k = t.truck || {};
@@ -690,7 +720,7 @@ function detailsPane(t) {
   const cls = { ok: 'delivered', warn: 'at_border', bad: 'cancelled' };
   const docs = DOCS.map(([key, l]) => { const s = dStat((t.docs || {})[key]); return `<div class="item"><span class="dt">${esc(l)}</span><span>${fmtDate((t.docs || {})[key]) || '—'}</span><span class="chip ${cls[s]}">${s === 'ok' ? 'Valid' : s === 'warn' ? 'Expires soon' : 'Expired or missing'}</span></div>`; }).join('');
   const creator = S.accounts[t.createdBy];
-  return `<h2>Driver</h2>${row('Name', d.name)}${row('NRC', d.nrc)}${row('Phone', d.phone)}${row('Licence no.', d.licenceNo)}
+  return `<h2>Driver</h2>${row('Name', d.name)}${row('NRC', d.nrc)}${row('Phone', d.phone)}${row('Licence no.', d.licenceNo)}${row('Passport no.', d.passportNo)}
     <h2>Truck</h2>${row('Registration', k.reg)}${row('Trailer', k.trailer)}
     <h2>Cargo</h2>${row('Description', c.description)}${row('HS code', c.hs)}${row('Weight (kg)', fmtN(c.weight))}${row('Value (USD)', fmtN(c.value))}${row('Dangerous goods', c.dangerous ? 'Yes, UN ' + c.un : 'No')}
     <h2>Trip</h2>${row('Company', companyName(t.companyCode) + ' (' + t.companyCode + ')')}${row('Route', t.route)}${row('Clearance', t.clearance)}${row('Reference', t.reference)}${row('Departure', fmtDate(t.departure))}${row('Created by', creator ? creator.name + ' (' + (ROLE_NAME[creator.role] || creator.role) + ')' : '')}${row('Created', fmtTime(t.createdAt))}
@@ -702,12 +732,12 @@ function manifestPane(t) {
   const admin = myRole() === 'admin';
   return `<div class="card"><div class="row"><b>Border QR code</b>${m ? `<span class="chip ${m.status === 'valid' ? 'delivered' : 'cancelled'}">${m.status === 'valid' ? 'Valid' : 'Cancelled'}</span>` : ''}</div>
     <p class="meta">Border officers check this code against the record Corridor issued. Edited, fake or cancelled codes are flagged.</p>
-    ${can('share') && issued ? '<div id="qrbox"></div>' : ''}
+    ${can('share') && issued ? '<div class="qrframe"><div id="qrbox"></div><small>Stick it inside the windscreen, lower driver\'s side, facing out. Keep it flat and unobstructed.</small></div>' : ''}
     ${m ? '' : '<p class="muted">No QR code has been generated for this trip yet.</p>'}
     ${!can('share') && issued ? '<p class="muted">Manifest issued. The driver can show the QR from this trip.</p>' : ''}
     <div class="actions">${(admin || (!m && can('share'))) && t.status !== 'cancelled' ? `<button class="btn" data-act="issue" data-v="${esc(t.id)}">${m ? 'Issue a new QR' : 'Generate QR code'}</button>` : ''}
     ${admin && issued ? `<button class="link danger" data-act="revoke" data-v="${esc(t.id)}">Cancel this manifest</button>` : ''}
-    ${issued ? '<button class="link" data-act="saveqr">Save PNG</button><button class="link" data-act="print">Print</button>' : ''}</div></div>
+    ${issued ? '<button class="link" data-act="qrsheet">Sticker with placement guide</button><button class="link" data-act="saveqr">Save PNG</button><button class="link" data-act="print">Print</button>' : ''}</div></div>
     ${m && can('share') ? `<div class="card"><div class="eyebrow">Manifest contents</div><pre class="mono">${esc(m.payload)}</pre></div>` : ''}`;
 }
 async function issueManifest(t, msg) {
@@ -733,6 +763,163 @@ async function logCheckpoint(id) {
     status, updatedAt: at
   }), 'Checkpoint logged: ' + name);
 }
+const FMT = {
+  phone: (v) => { let d = v.replace(/\D/g, ''); if (d.startsWith('260')) d = d.slice(3); else if (d.startsWith('0')) d = d.slice(1); d = d.slice(0, 9); return '+260' + (d ? ' ' + d.slice(0, 2) : '') + (d.length > 2 ? ' ' + d.slice(2, 5) : '') + (d.length > 5 ? ' ' + d.slice(5) : ''); },
+  nrc: (v) => { const d = v.replace(/\D/g, '').slice(0, 9); return d.slice(0, 6) + (d.length > 6 ? '/' + d.slice(6, 8) : '') + (d.length > 8 ? '/' + d.slice(8) : ''); },
+  plate: (v) => { const x = v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10), m = x.match(/^([A-Z]{2,3})(\d+)$/); return m ? m[1] + ' ' + m[2] : x; },
+  licence: (v) => v.toUpperCase().replace(/[^A-Z0-9\/-]/g, '').slice(0, 20),
+  passport: (v) => v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 9)
+};
+const OK = { phone: /^\+260\d{9}$/, plate: /^(?=.*[A-Z])(?=.*\d)[A-Z0-9 ]{4,10}$/, licence: /^[A-Z0-9\/-]{5,20}$/, passport: /^[A-Z0-9]{6,9}$/ };
+const CARGO = [
+  ['Minerals and metals', [['Copper cathodes', '7403'], ['Copper concentrate', '2603'], ['Copper blister or anodes', '7402'], ['Cobalt (metal or hydroxide)', '8105'], ['Manganese ore', '2602'], ['Zinc or lead concentrate', '2608'], ['Coal', '2701'], ['Gemstones (emeralds, amethyst)', '7103'], ['Limestone and lime', '2521'], ['Scrap metal', '7204']]],
+  ['Farm produce and food', [['Maize and maize meal', '1005'], ['Wheat and wheat flour', '1001'], ['Soya beans', '1201'], ['Sugar', '1701'], ['Tobacco', '2401'], ['Cotton', '5201'], ['Groundnuts', '1202'], ['Rice', '1006'], ['Fresh vegetables', '0709'], ['Fresh fruit', ''], ['Fish', '0302'], ['Live animals and livestock', '0102'], ['Cooking oil', '1507'], ['Beer and soft drinks', '2203'], ['Packaged food and groceries', '']]],
+  ['Fuel and chemicals', [['Diesel and petrol', '2710'], ['Lubricants and oils', '2710'], ['LPG and gas', '2711'], ['Sulphur', '2503'], ['Sulphuric acid', '2807'], ['Explosives', '3602'], ['Industrial chemicals', '38'], ['Fertiliser', '3105'], ['Animal feed', '2309']]],
+  ['Building and industrial', [['Cement', '2523'], ['Steel and iron products', '72'], ['Timber and wood products', '44'], ['Mining equipment and machinery', '84'], ['Electrical equipment', '85'], ['Building materials', '68'], ['Plastics', '39'], ['Paper and packaging', '48']]],
+  ['Vehicles and consumer goods', [['Vehicles and spare parts', '87'], ['Tyres', '4011'], ['Electronics and appliances', '85'], ['Clothing and textiles', '62'], ['Second-hand clothing', '6309'], ['Furniture', '9403'], ['Household goods', '']]],
+  ['Medical and aid', [['Medicines', '3004'], ['Medical equipment', '9018'], ['Humanitarian aid', '']]],
+  ['General', [['Containers (loaded)', ''], ['Mixed or general cargo', '']]]
+];
+const BIZ = { name: 'Corridor Freight Management', phone: '+260 76 799 2911', tel: '+260767992911', email: 'lubutochama16@gmail.com' };
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); S.installEv = e; });
+function infoHTML(k) {
+  const back = '<button class="link" data-act="infoClose">Back to the app</button>';
+  const sec = (h, t) => `<h2>${h}</h2><p>${t}</p>`;
+  if (k === 'contact') return `${back}<div class="eyebrow">Get in touch</div><h1>Contact</h1><div class="card"><b>${BIZ.name}</b><p class="meta">Zambia</p>
+    <p><a class="link" href="tel:${BIZ.tel}">Call ${BIZ.phone}</a><br><a class="link" target="_blank" rel="noopener" href="https://wa.me/${BIZ.tel.replace('+', '')}">Message on WhatsApp</a><br><a class="link" href="mailto:${BIZ.email}">${BIZ.email}</a></p></div>
+    <p class="muted">Questions, support, feedback or a request to delete your data: reach out on any of the above.</p>`;
+  if (k === 'privacy') return `${back}<div class="eyebrow">Last updated November 2026</div><h1>Privacy notice</h1>
+    ${sec('Who we are', `${BIZ.name} runs this app. Contact us at ${BIZ.email} or ${BIZ.phone}.`)}
+    ${sec('What we collect', 'Your name, username and role. For drivers: phone, NRC, driving licence and passport numbers. For trips: truck and trailer registration, cargo, route, document expiry dates and trip history. Your location, only while you switch on GPS sharing and when you verify a delivery. Proof of delivery: the receiver\'s name, signature and an optional photo. Records of QR codes officers check.')}
+    ${sec('Why', 'To create trip manifests and QR codes, let border officers verify them, track trips, and produce delivery documents. We do not sell your data or use it for advertising.')}
+    ${sec('Who can see it', 'The admin can see everything. Your company\'s dispatchers and drivers see that company\'s trips. Border officers can view trip details so they can check manifests. Please only enter information you are allowed to share.')}
+    ${sec('Where it is kept', 'On Google Firebase servers. A copy is also saved on your device so the app works offline, until you log out or clear the site data. Passwords are handled by Firebase Authentication and are never shown to us.')}
+    ${sec('Your choices', `Ask us to correct or delete your information at ${BIZ.email}. Deleting a record may stop trips that depend on it from verifying.`)}`;
+  return `${back}<div class="eyebrow">About</div><h1>${BIZ.name}</h1>
+    ${sec('What it does', 'Corridor gives every cross-border freight trip a digital manifest with a QR code. Transport companies record the trip once. Border officers scan the code to see at once if it is valid, expired, cancelled or edited. The app also tracks trucks, finds backhaul loads, records proof of delivery and prepares delivery documents.')}
+    ${sec('What it is not', 'Corridor supplements official border and customs processes. It does not replace any declaration, and it is not an official system of the Zambia Revenue Authority unless ZRA says so.')}
+    ${sec('Version', 'v1.0')}
+    ${S.installEv ? '<button class="btn wide" data-act="install">Install the app on this phone</button>' : '<p class="muted">To install: open the browser menu and choose Add to Home screen.</p>'}
+    <button class="btn wide line" data-act="info" data-v="contact">Contact us</button>`;
+}
+function podPane(t, canLog) {
+  const p = t.pod;
+  if (p) {
+    const img = (src, alt, extra) => `<img alt="${alt}" src="${src}" style="max-width:100%;border:1px solid var(--line);border-radius:10px;background:#fff;${extra || ''}">`;
+    return `<div class="card"><div class="row"><b>Proof of delivery</b><span class="chip delivered">Verified</span></div>
+      <p class="meta">Received by ${esc(p.name)}${p.phone ? ' · ' + esc(p.phone) : ''}<br>${fmtTime(p.at)} · logged by ${esc(p.by || '')}</p>${p.note ? `<p>${esc(p.note)}</p>` : ''}
+      ${p.lat ? `<a class="link" target="_blank" rel="noopener" href="https://www.google.com/maps?q=${Number(p.lat)},${Number(p.lng)}">Where it was delivered</a>` : ''}
+      ${p.sig ? img(p.sig, 'Receiver signature') : ''}${p.photo ? img(p.photo, 'Delivery photo', 'margin-top:8px') : ''}
+      <button class="btn wide" data-act="dtab" data-v="docs">Open delivery documents</button></div>`;
+  }
+  if (t.status !== 'delivered' || !canLog) return '';
+  const f = (id, l, a) => `<label class="field"><span>${l}</span><input id="${id}" ${a || ''}></label>`;
+  return `<div class="card"><b>Proof of delivery</b><p class="muted">Get the receiver's name and signature to verify this delivery. This unlocks the delivery documents.</p>
+    ${f('pod-name', "Receiver's name")}${f('pod-phone', 'Receiver phone (optional)', 'type="tel" data-fmt="phone"')}${f('pod-note', 'Note (optional), e.g. damaged pallets')}
+    <span class="meta">Receiver signs here</span><canvas id="sig" width="600" height="220" style="width:100%;touch-action:none;background:#fff;border:1px solid var(--line);border-radius:10px"></canvas>
+    <button class="link" data-act="sigClear">Clear signature</button>
+    <label class="field"><span>Photo of delivered goods (optional)</span><input id="pod-photo" type="file" accept="image/*" capture="environment"></label>
+    <button class="btn wide" data-act="savePod" data-v="${esc(t.id)}">Verify delivery</button></div>`;
+}
+function initSig() {
+  const c = $('#sig'); if (!c) return;
+  const g = c.getContext('2d'); g.lineWidth = 3; g.lineCap = 'round'; g.strokeStyle = '#111';
+  S.sigInk = false; let d = false;
+  const pt = (e) => { const r = c.getBoundingClientRect(); return [(e.clientX - r.left) * c.width / r.width, (e.clientY - r.top) * c.height / r.height]; };
+  c.onpointerdown = (e) => { d = true; c.setPointerCapture(e.pointerId); const [x, y] = pt(e); g.beginPath(); g.moveTo(x, y); };
+  c.onpointermove = (e) => { if (!d) return; const [x, y] = pt(e); g.lineTo(x, y); g.stroke(); S.sigInk = true; };
+  c.onpointerup = c.onpointercancel = () => { d = false; };
+}
+const shrink = (f) => new Promise((res) => {
+  const im = new Image(), u = URL.createObjectURL(f);
+  im.onload = () => { const k = Math.min(1, 800 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg', 0.6)); };
+  im.onerror = () => res(''); im.src = u;
+});
+async function savePod(id) {
+  const t = S.trips.find((x) => x.id === id), name = val('#pod-name');
+  if (!t) return;
+  if (!name) throw new Error("Enter the receiver's name.");
+  if (!S.sigInk) throw new Error('The receiver must sign in the box.');
+  const f = $('#pod-photo').files[0], photo = f ? await shrink(f) : '';
+  let pos = null;
+  try { pos = await new Promise((ok, no) => navigator.geolocation.getCurrentPosition(ok, no, { timeout: 8000, maximumAge: 60000 })); } catch (e) {}
+  const by = me() ? me().name : 'Admin', at = now();
+  const pod = { name, phone: val('#pod-phone').length > 5 ? val('#pod-phone') : '', note: val('#pod-note'), sig: $('#sig').toDataURL('image/png'), photo, at, by, lat: pos ? pos.coords.latitude : null, lng: pos ? pos.coords.longitude : null };
+  await write(() => S.db.doc('trips/' + id).update({ pod, events: [...(t.events || []), { at, by, text: 'Delivery verified. Received by ' + name }], updatedAt: at }), 'Delivery verified. Your documents are ready.');
+  S.detailTab = 'docs';
+}
+function shareStatus(id) {
+  const t = S.trips.find((x) => x.id === id); if (!t) return;
+  const live = liveFor(id), cps = t.checkpoints || [];
+  const msg = `Corridor trip update\nTruck ${t.truck && t.truck.reg}: ${t.route}\nStatus: ${STATUS[t.status] || t.status}\nLast checkpoint: ${cps.length ? cps[cps.length - 1].name + ' (' + fmtTime(cps[cps.length - 1].at) + ')' : 'not left yet'}`
+    + (live ? `\nLive position (${ago(live.at)}): https://www.google.com/maps?q=${live.lat},${live.lng}` : '') + (t.pod ? `\nDelivered and signed for by ${t.pod.name}.` : '');
+  window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank');
+}
+function docsPane(t) {
+  if (!t.pod) return '<div class="card"><b>Documents</b><p class="muted">Delivery note, invoice and purchase order unlock once the delivery is verified with proof of delivery.</p></div>';
+  const b = t.billing || {}, f = (id, l, v, a) => `<label class="field"><span>${l}</span><input id="${id}" value="${esc(v || '')}" ${a || ''}></label>`;
+  return `<div class="card"><b>Delivery note</b><p class="muted">Ready now. Includes the receiver's signature.</p><button class="btn wide" data-act="doc" data-v="note" data-id="${esc(t.id)}">Open delivery note</button></div>
+    <div class="card"><b>Invoice and purchase order</b><p class="muted">Fill in the billing details once. Both documents use them.</p>
+    ${f('bl-customer', 'Customer name', b.customer)}${f('bl-ctpin', 'Customer TPIN', b.customerTpin, 'inputmode="numeric"')}${f('bl-stpin', 'Your company TPIN', b.supplierTpin, 'inputmode="numeric"')}${f('bl-amount', 'Freight charge (ZMW)', b.amount, 'type="number" inputmode="decimal"')}
+    <label class="ck"><input id="bl-vat" type="checkbox" ${b.vat !== false ? 'checked' : ''}> Add 16% VAT</label>
+    <button class="btn wide" data-act="doc" data-v="invoice" data-id="${esc(t.id)}">Open invoice</button><button class="btn wide line" data-act="doc" data-v="lpo" data-id="${esc(t.id)}">Open purchase order (LPO)</button></div>`;
+}
+function docHTML(kind, t, b) {
+  const co = companyName(t.companyCode) || 'Transport company', d = t.driver || {}, k = t.truck || {}, c = t.cargo || {}, p = t.pod || {};
+  const ref = t.id.slice(-6).toUpperCase(), yr = new Date().getFullYear(), today = fmtDate(iso(new Date()));
+  const amt = Number(b.amount || 0), vat = b.vat ? amt * 0.16 : 0, m = (n) => 'ZMW ' + n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const row = (l, v) => `<tr><td class="l">${l}</td><td>${esc(v || '—')}</td></tr>`;
+  const cargoRows = row('Cargo', c.description) + row('Weight', fmtN(c.weight) + ' kg') + row('Route', t.route) + row('Truck', (k.reg || '') + (k.trailer ? ' / ' + k.trailer : '')) + row('Driver', d.name);
+  const money = `<table><tr><td class="l">Freight: ${esc(t.route)}</td><td class="r">${m(amt)}</td></tr>${b.vat ? `<tr><td class="l">VAT 16%</td><td class="r">${m(vat)}</td></tr>` : ''}<tr><td class="l"><b>Total</b></td><td class="r"><b>${m(amt + vat)}</b></td></tr></table>`;
+  let title, body;
+  if (kind === 'note') {
+    title = 'Delivery Note'; body = `<p>No. DN-${yr}-${ref} &nbsp;·&nbsp; ${today}</p><h3>From</h3><p>${esc(co)}</p><table>${cargoRows}${row('Departed', fmtDate(t.departure))}${row('Reference', t.reference)}</table>
+      <h3>Received</h3><table>${row('Received by', p.name)}${row('Phone', p.phone)}${row('Date and time', fmtTime(p.at))}${row('Note', p.note)}</table>${p.sig ? `<p>Signature:<br><img src="${p.sig}" style="max-width:320px;border:1px solid #ccc"></p>` : ''}${p.photo ? `<img src="${p.photo}" style="max-width:320px">` : ''}`;
+  } else if (kind === 'invoice') {
+    title = 'Tax Invoice (draft)'; body = `<p>No. INV-${yr}-${ref} &nbsp;·&nbsp; ${today}</p><h3>From</h3><p>${esc(co)}<br>TPIN: ${esc(b.supplierTpin || '—')}</p><h3>Bill to</h3><p>${esc(b.customer || '—')}<br>TPIN: ${esc(b.customerTpin || '—')}</p>
+      <table>${cargoRows}</table>${money}<p class="warn">Draft invoice made by Corridor from the trip record. It is not a ZRA Smart Invoice. For tax purposes, issue the fiscal invoice through your ZRA-approved system (VSDC).</p>`;
+  } else {
+    title = 'Local Purchase Order'; body = `<p>No. LPO-${yr}-${ref} &nbsp;·&nbsp; ${today}</p><h3>Issued by</h3><p>${esc(b.customer || '—')}<br>TPIN: ${esc(b.customerTpin || '—')}</p><h3>Supplier</h3><p>${esc(co)}<br>TPIN: ${esc(b.supplierTpin || '—')}</p>
+      <p>Please supply road freight transport as follows:</p><table>${cargoRows}</table>${money}<p class="muted">Payment terms as agreed between the parties. Signed for the issuer: ______________________</p>`;
+  }
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} ${ref}</title><style>body{font:15px/1.5 system-ui,sans-serif;max-width:720px;margin:20px auto;padding:0 16px;color:#111}h1{margin:0}h3{margin:18px 0 4px;color:#c4531f}table{width:100%;border-collapse:collapse;margin:8px 0}td{border-bottom:1px solid #ddd;padding:6px 4px;vertical-align:top}td.l{color:#555;width:38%}td.r{text-align:right}.warn{background:#fff1d6;padding:10px;border-radius:8px;font-size:13px}.muted{color:#555}button{padding:10px 18px;font-size:16px;margin:12px 0}@media print{button{display:none}}</style><button onclick="print()">Print or save as PDF</button><h1>${title}</h1><b>${esc(co)}</b>${body}`;
+}
+async function openDoc(kind, id) {
+  const t = S.trips.find((x) => x.id === id); if (!t) return;
+  const w = window.open('', '_blank');
+  if (!w) throw new Error('Allow pop-ups for this site to open the document.');
+  const old = t.billing || {}, g = (sel, k) => ($(sel) ? val(sel) : old[k] || '');
+  const b = kind === 'note' ? old : { customer: g('#bl-customer', 'customer'), customerTpin: g('#bl-ctpin', 'customerTpin'), supplierTpin: g('#bl-stpin', 'supplierTpin'), amount: g('#bl-amount', 'amount'), vat: $('#bl-vat') ? $('#bl-vat').checked : old.vat !== false };
+  w.document.write(docHTML(kind, t, b)); w.document.close();
+  if (kind !== 'note') await write(() => S.db.doc('trips/' + id).update({ billing: b }));
+}
+
+// ---------- backhaul load board ----------
+function viewLoads() {
+  const r = myRole(), mineCo = myCode();
+  const drops = visibleTrips().filter((t) => t.status !== 'cancelled' && t.status !== 'planned').map((t) => String(t.route).split(' to ')[1]).filter(Boolean).map((x) => x.toLowerCase());
+  const match = (l) => l.from && drops.some((dn) => l.from.toLowerCase().includes(dn) || dn.includes(l.from.toLowerCase()));
+  const list = Object.entries(S.loads).map(([id, l]) => ({ id, ...l })).sort((a, b) => (b.status === 'open') - (a.status === 'open') || match(b) - match(a) || String(b.at).localeCompare(String(a.at)));
+  const phone = (p) => String(p || '').replace(/[^\d+]/g, '');
+  const rows = list.map((l) => {
+    const own = l.by === S.uid || r === 'admin';
+    const call = l.phone ? `<a class="link" href="tel:${esc(phone(l.phone))}">Call</a> <a class="link" target="_blank" rel="noopener" href="https://wa.me/${esc(phone(l.phone).replace('+', ''))}">WhatsApp</a>` : '';
+    const act = l.status === 'open' ? (r !== 'admin' && !own ? `<button class="btn wide" data-act="claimLoad" data-v="${esc(l.id)}">I can carry this load</button>` : '') : `<p class="meta">Taken by ${esc(l.claimedName || '')}${l.claimedCompany ? ' (' + esc(l.claimedCompany) + ')' : ''}</p>${own ? `<button class="link" data-act="reopenLoad" data-v="${esc(l.id)}">Reopen</button>` : ''}`;
+    return `<div class="card"><div class="row"><b>${esc(l.from)} → ${esc(l.to)}</b><span class="chip ${l.status === 'open' ? 'delivered' : ''}">${l.status === 'open' ? 'Open' : 'Taken'}</span></div>
+      ${l.status === 'open' && match(l) ? '<div class="chip at_border">Matches your return route</div>' : ''}
+      <p class="meta">${esc(l.cargo)} · ${fmtN(l.weight)} kg${l.ready ? ' · ready ' + fmtDate(l.ready) : ''}${l.rate ? ' · ZMW ' + fmtN(l.rate) : ''}<br>Posted by ${esc(l.byName || '')}${l.company ? ' (' + esc(l.company) + ')' : ''} ${ago(l.at)}</p>${call}${act}${own ? `<button class="link danger" data-act="deleteLoad" data-v="${esc(l.id)}">Delete</button>` : ''}</div>`;
+  }).join('') || '<p class="muted">No loads posted yet.</p>';
+  const f = (id, l, a) => `<label class="field"><span>${l}</span><input id="${id}" ${a || ''}></label>`;
+  const post = r === 'dispatch' ? `<div class="card"><b>Post a load</b><p class="muted">Have freight waiting? Trucks heading back empty can pick it up.</p>${f('ld-from', 'From (town)')}${f('ld-to', 'To (town)')}${f('ld-cargo', 'Cargo')}${f('ld-weight', 'Weight (kg)', 'type="number" inputmode="decimal"')}${f('ld-ready', 'Ready from', 'type="date"')}${f('ld-rate', 'Offered rate in ZMW (optional)', 'type="number" inputmode="decimal"')}${f('ld-phone', 'Contact phone', 'type="tel" placeholder="+260 97 123 4567" data-fmt="phone"')}<button class="btn wide" data-act="postLoad">Post load</button></div>` : '';
+  return `<div class="eyebrow">Backhaul</div><h1>Loads</h1><p class="muted">Loads that match where your trucks are delivering show first.</p>${post}${rows}`;
+}
+async function postLoad() {
+  const l = { from: val('#ld-from'), to: val('#ld-to'), cargo: val('#ld-cargo'), weight: Number(val('#ld-weight')) || 0, ready: val('#ld-ready'), rate: Number(val('#ld-rate')) || 0, phone: val('#ld-phone') };
+  if (!l.from || !l.to || !l.cargo) throw new Error('Enter where the load is from, where it goes and what it is.');
+  if (!OK.phone.test(l.phone.replace(/\s/g, ''))) throw new Error('Enter the contact phone as +260 and nine digits.');
+  await write(() => S.db.doc('loads/' + newId('load')).set({ ...l, status: 'open', by: S.uid, byName: me().name, company: companyName(myCode()), at: now() }), 'Load posted.');
+}
+
 function toggleGps(id) {
   if (S.gps.on) {
     if (S.gps.watch !== null) navigator.geolocation.clearWatch(S.gps.watch);
@@ -768,6 +955,7 @@ function makeQR(el, text) {
 function afterRender() {
   const box = $('#qrbox'), t = S.trips.find((x) => x.id === S.cur);
   if (box && t && S.manifests[t.id] && S.manifests[t.id].status === 'valid') makeQR(box, JSON.stringify({ id: t.id, p: S.manifests[t.id].payload }));
+  initSig();
   if (S.tab === 'scan') {
     if (S.scan.stream) { attachCamera(); if (!S.scan.raf) scanLoop(); }
     showVerdict();
@@ -940,6 +1128,16 @@ async function act(a, b) {
       return;
     case 'open': S.cur = b.dataset.id; S.tab = 'detail'; S.detailTab = 'track'; S.flash = ''; return;
     case 'dtab': S.detailTab = b.dataset.v; return;
+    case 'info': S.info = b.dataset.v; window.scrollTo(0, 0); return;
+    case 'infoClose': S.info = null; window.scrollTo(0, 0); return;
+    case 'install': if (S.installEv) { S.installEv.prompt(); S.installEv = null; } return;
+    case 'savePod': return savePod(b.dataset.v);
+    case 'shareStatus': shareStatus(b.dataset.v); return;
+    case 'doc': return openDoc(b.dataset.v, b.dataset.id);
+    case 'postLoad': return postLoad();
+    case 'claimLoad': return write(() => S.db.doc('loads/' + b.dataset.v).update({ status: 'claimed', claimedBy: S.uid, claimedName: me() ? me().name : '', claimedCompany: companyName(myCode()), claimedAt: now() }), 'Load claimed. Call the poster to agree the details.');
+    case 'reopenLoad': return write(() => S.db.doc('loads/' + b.dataset.v).update({ status: 'open', claimedBy: '', claimedName: '', claimedCompany: '' }), 'Load reopened.');
+    case 'deleteLoad': return write(() => S.db.doc('loads/' + b.dataset.v).delete(), 'Load deleted.');
     case 'filter': S.filter = b.dataset.v; return;
     case 'next': {
       const e = validateStep(S.wiz.step); S.wiz.errors = e;
@@ -959,6 +1157,17 @@ async function act(a, b) {
       if (!src) throw new Error('Show the QR first.');
       const link = document.createElement('a'); link.href = src; link.download = 'corridor-manifest-' + S.cur + '.png';
       document.body.appendChild(link); link.click(); link.remove(); return;
+    }
+    case 'qrsheet': {
+      const cv = $('#qrbox canvas'), im = $('#qrbox img'), src = cv ? cv.toDataURL('image/png') : (im ? im.src : ''), t = S.trips.find((x) => x.id === S.cur) || {};
+      if (!src) throw new Error('The QR is not showing yet.');
+      const w = window.open('', '_blank'); if (!w) throw new Error('Allow pop-ups for this site to open the sticker.');
+      w.document.write(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QR sticker</title><style>body{font:15px/1.4 system-ui,sans-serif;max-width:640px;margin:16px auto;padding:0 14px;text-align:center}.cut{width:9cm;max-width:100%;margin:12px auto;padding:.5cm;border:2px dashed #c4531f;border-radius:10px}.cut img{width:100%;display:block}.cut b{display:block;margin-top:6px}button{padding:10px 18px;font-size:16px}@media print{button,.guide{display:none}}</style>
+        <button onclick="print()">Print</button><p>Print at 100% size, cut along the dashed line and stick it where shown.</p>
+        <div class="cut"><img src="${src}" alt="QR"><b>${esc(String(t.truck && t.truck.reg || ''))} · ${esc(t.route || '')}</b><small>Corridor manifest · scan at the border</small></div>
+        <div class="guide"><h3>Where to stick it</h3><svg viewBox="0 0 300 170" width="300"><rect x="20" y="10" width="260" height="150" rx="18" fill="#eee" stroke="#555" stroke-width="3"/><rect x="40" y="25" width="220" height="70" rx="8" fill="#dbe9f6" stroke="#555" stroke-width="2"/><rect x="48" y="55" width="34" height="34" fill="none" stroke="#c4531f" stroke-width="3" stroke-dasharray="5 3"/><text x="90" y="76" font-size="11" fill="#c4531f">1 Stick here</text><text x="150" y="130" font-size="11" fill="#333">Front of cab (inside windscreen)</text></svg>
+        <p>1. Inside the windscreen, lower driver's side, facing out.<br>2. Backup: the driver's side window or door. Keep it flat, clean and not covered by other stickers.</p></div>`);
+      w.document.close(); return;
     }
     case 'print': window.print(); return;
     case 'camera':
@@ -998,6 +1207,7 @@ document.addEventListener('click', async (e) => {
   const b = e.target.closest('[data-act]');
   if (!b) return;
   const a = b.dataset.act;
+  if (a === 'sigClear') { const c = $('#sig'); if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height); S.sigInk = false; return; }
   let failed = false;
   try { await act(a, b); }
   catch (err) { failed = true; console.error(err); toast(errText(err)); }
@@ -1009,8 +1219,13 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('input', (e) => {
   const t = e.target;
+  if (t.dataset && FMT[t.dataset.fmt]) { const v = FMT[t.dataset.fmt](t.value); if (v !== t.value) t.value = v; }
   if (t.matches('[data-w]') && S.wiz) { S.wiz.data[t.dataset.w] = t.type === 'checkbox' ? t.checked : t.value; return; }
   if (t.matches('[data-q]')) { S.q = t.value; const list = $('#tripList'); if (list) list.innerHTML = tripListHTML(); }
+});
+document.addEventListener('focusin', (e) => {
+  const t = e.target;
+  if (t.dataset && t.dataset.fmt === 'phone' && !t.value) { t.value = '+260 '; t.dispatchEvent(new Event('input', { bubbles: true })); }
 });
 document.addEventListener('change', async (e) => {
   const t = e.target;
@@ -1033,6 +1248,12 @@ document.addEventListener('change', async (e) => {
     S.wiz.data[k] = t.type === 'checkbox' ? t.checked : t.value;
     if (k === 'companyCode') { S.wiz.data.driverUid = ''; return show(); }
     if (k === 'dangerous') return show();
+    if (k === 'cargoSel') {
+      const hit = CARGO.flatMap((g) => g[1]).find((x) => x[0] === t.value), d = S.wiz.data;
+      d.cargo = t.value === 'Other' ? (d.cargoOther || '') : t.value;
+      if (hit && hit[1] && (!d.hs || d.hs === d.hsAuto)) { d.hs = hit[1]; d.hsAuto = hit[1]; }
+      return show();
+    }
     if (k === 'driverUid') {
       const a = S.accounts[t.value];
       if (a) Object.assign(S.wiz.data, { driverName: a.name || '', phone: a.phone || '' });
@@ -1046,6 +1267,7 @@ window.addEventListener('offline', () => { if (S.db) show(); });
 // ---------- start ----------
 function boot() {
   S.user = {}; S.canWrite = true;
+  $('#yr').textContent = new Date().getFullYear();
   if ('serviceWorker' in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sw', e));
   if (FIREBASE_CONFIG.apiKey && window.firebase) {
     S.fb = true;
