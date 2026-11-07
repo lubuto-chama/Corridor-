@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bip=e;});
+window.addEventListener('appinstalled',function(){window.__bip=null;window.__installed=true;});
+</script>
 <title>Corridor Freight Management</title>
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#141a24">
@@ -120,6 +124,11 @@ button.pill{cursor:pointer;font-family:inherit}
 .rolecard b{display:block;font:700 26px/1.05 "Barlow Condensed",sans-serif}
 .rolecard span{color:var(--muted);font-size:14px}
 .qrframe{border:3px dashed var(--orange);border-radius:16px;padding:12px;margin:12px 0;text-align:center}.qrframe #qrbox{margin:0 0 8px}.qrframe small{display:block;color:var(--muted)}
+.seg.five button{font-size:13px;padding:8px 2px}
+.stbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 4px}
+.stbtns .btn{padding:12px 6px;font-size:15px}
+.pill.inst{background:var(--orange);border-color:var(--orange)}
+.rcpt{width:48px;height:48px;object-fit:cover;border-radius:8px;flex:none}
 </style>
 </head>
 <body>
@@ -131,7 +140,7 @@ button.pill{cursor:pointer;font-family:inherit}
   <div id="topRight"></div>
 </header>
 <main id="app"><p class="muted">Connecting…</p></main>
-<footer id="foot"><div>&copy; <span id="yr"></span> Corridor Freight Management &middot; v1.0</div><div><button class="link" data-act="info" data-v="about">About</button> &middot; <button class="link" data-act="info" data-v="contact">Contact</button> &middot; <button class="link" data-act="info" data-v="privacy">Privacy</button></div></footer>
+<footer id="foot"><div>&copy; <span id="yr"></span> Corridor Freight Management &middot; v1.2</div><div><button class="link" data-act="info" data-v="about">About</button> &middot; <button class="link" data-act="info" data-v="contact">Contact</button> &middot; <button class="link" data-act="info" data-v="privacy">Privacy</button></div></footer>
 <nav id="tabs" hidden></nav>
 <div id="toast" role="status" aria-live="polite"></div>
 <script>
@@ -151,6 +160,17 @@ const CLEAR = ['Transit (T1)', 'Export', 'Import', 'Certificate of origin (COMES
 const DOCS = [['road', 'Road licence'], ['rtsa', 'RTSA fitness certificate'], ['yellow', 'COMESA yellow card'], ['insurance', 'Goods-in-transit insurance'], ['licence', 'Driving licence'], ['medical', 'Medical certificate'], ['passport', 'Passport']];
 const STEPS = ['Truck & driver', 'Cargo & route', 'Clearance & documents', 'Review'];
 const STATUS = { planned: 'Planned', on_road: 'On the road', at_border: 'At a border', delivered: 'Delivered', cancelled: 'Cancelled' };
+const QS = [
+  ['queue', 'In queue', ''],
+  ['transit', 'In transit', 'In transit, on the road'],
+  ['border', 'At the border', 'At the border, waiting for clearance'],
+  ['cleared', 'Cleared, moving', 'Cleared and moving again'],
+  ['offload', 'Offloading', 'Arrived and offloading'],
+  ['rest', 'Resting', 'Stopped to rest'],
+  ['fuel', 'Fuelling', 'Stopped for fuel'],
+  ['trouble', 'Breakdown', 'Breakdown or problem. Please call me']
+];
+const BOSS_KEY = 'corridor-boss-phone';
 const ROLE_NAME = { admin: 'Admin', dispatch: 'Dispatch', driver: 'Driver', border: 'Border officer' };
 const TABS = {
   admin: [['trips', 'Trips'], ['new', 'New trip'], ['logs', 'Logs'], ['company', 'Companies'], ['scan', 'Scan'], ['control', 'Control']],
@@ -325,15 +345,24 @@ function listen() {
     });
     done();
   });
-  on('accounts', (snap) => { S.accounts = byId(snap); S.accLoaded = true; done(); });
-  on('companies', (snap) => { S.companies = byId(snap); done(); });
+  const r0 = S.role0, border = r0 === 'border', scoped = S.fb && (r0 === 'dispatch' || r0 === 'driver');
+  const wh = (name, f, v) => S.db.collection(name).where(f, '==', v);
+  const accQ = !S.fb || r0 === 'admin' ? undefined : border ? wh('accounts', 'username', S.uname0) : wh('accounts', 'companyCode', S.code0);
+  on('accounts', (snap) => {
+    S.accounts = byId(snap); S.accLoaded = true;
+    if (S.fb && border && !S.bOk && me() && me().approved === true) { S.bOk = true; listen(); return; }
+    done();
+  }, accQ);
+  const full = !border || S.bOk;
+  if (!border) on('companies', (snap) => { S.companies = byId(snap); done(); }, scoped ? wh('companies', 'code', S.code0) : undefined);
   on('suspensions', (snap) => { S.susp = byId(snap); done(); });
-  on('manifests', (snap) => { S.manifests = byId(snap); done(); });
-  on('live', (snap) => { S.live = byId(snap); done(); });
-  on('trips', (snap) => { S.trips = snap.docs.filter((d) => d.exists).map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)); done(); });
-  on('loads', (snap) => { S.loads = byId(snap); done(); });
+  if (full) on('manifests', (snap) => { S.manifests = byId(snap); done(); }, scoped ? wh('manifests', 'companyCode', S.code0) : undefined);
+  if (full) on('live', (snap) => { S.live = byId(snap); done(); }, scoped ? wh('live', 'companyCode', S.code0) : undefined);
+  const tripQ = !scoped ? undefined : r0 === 'dispatch' ? wh('trips', 'companyCode', S.code0) : wh('trips', 'driverUid', S.uid);
+  if (full) on('trips', (snap) => { S.trips = snap.docs.filter((d) => d.exists).map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.createdAt) - ms(a.createdAt)); done(); }, tripQ);
+  if (!border) on('loads', (snap) => { S.loads = byId(snap); done(); });
   const sc = S.db.collection('scans');
-  on('scans', (snap) => { S.scans = byId(snap); done(); }, S.fb && S.role0 !== 'admin' ? sc.where('by', '==', S.uid) : sc);
+  if (full) on('scans', (snap) => { S.scans = byId(snap); done(); }, S.fb && S.role0 !== 'admin' ? sc.where('by', '==', S.uid) : sc);
 }
 function done() {
   S.ready = true;
@@ -373,7 +402,7 @@ function page(html, tabs) {
 }
 function topbar() {
   const r = myRole(), signed = !!(me() || isAdmin());
-  $('#topRight').innerHTML = `<span class="pill ${navigator.onLine ? 'on' : ''}">${navigator.onLine ? 'Online' : 'Offline'}</span>${r ? `<span class="pill">${esc(ROLE_NAME[r] || r)}</span>` : ''}${signed ? '<button class="pill out" data-act="logout">Log out</button>' : ''}`;
+  $('#topRight').innerHTML = `<span class="pill ${navigator.onLine ? 'on' : ''}">${navigator.onLine ? 'Online' : 'Offline'}</span>${isStandalone() ? '' : '<button class="pill inst" data-act="install">Install</button>'}${r ? `<span class="pill">${esc(ROLE_NAME[r] || r)}</span>` : ''}${signed ? '<button class="pill out" data-act="logout">Log out</button>' : ''}`;
 }
 function renderTabs() {
   const r = myRole();
@@ -392,6 +421,7 @@ function show() {
   if (sysClosed()) return page(closedHTML('The admin has shut the whole system down for now. Check back later.'), false);
   if (suspUser()) return page(closedHTML('Your account has been disabled by the admin.'), false);
   if (suspCo()) return page(closedHTML('The admin has shut down your company for now.'), false);
+  if (S.fb && myRole() === 'border' && me().approved !== true) return page(`<div class="eyebrow">Border officer</div><h1>Waiting for approval</h1><p class="muted">An admin must approve your account before you can scan manifests. Check back soon.</p>`, false);
   if (myRole() === 'driver' && S.privFor !== S.uid) { loadPriv(); }
   const r = myRole(), allowed = (TABS[r] || []).map((t) => t[0]);
   if (!allowed.includes(S.tab) && S.tab !== 'detail') S.tab = allowed[0] || 'trips';
@@ -415,7 +445,7 @@ function renderAuth() {
   const a = S.auth, flash = S.flash ? notice(S.flash, 'ok') : '';
   S.err = ''; S.flash = '';
   if (a.view !== 'role') {
-    $('#app').innerHTML = `<section class="hero"><span class="badge">BUILT FOR ZAMBIAN HAULAGE</span><h1>Every trip,<br><span class="accent">border-ready.</span></h1><p>Corridor Freight Management turns every trip into a QR manifest that border officers can check, and tracks the truck from the yard to the port.</p></section>${flash}
+    $('#app').innerHTML = `<section class="hero"><span class="badge">BUILT FOR ZAMBIAN HAULAGE</span><h1>Every trip,<br><span class="accent">border-ready.</span></h1><p>Corridor Freight Management turns every trip into a QR manifest that border officers can check, and tracks the truck from the yard to the port.</p></section>${flash}${installCard()}
     <h2>Choose how you use Corridor</h2>${Object.keys(AUTH).map((r) => `<button class="card rolecard" data-act="authRole" data-v="${r}"><b>${esc(AUTH[r].t)}</b><span>${esc(AUTH[r].p)}</span></button>`).join('')}`;
     return;
   }
@@ -447,7 +477,7 @@ function logout() {
   S.priv = null; S.privFor = null; S.tab = 'trips'; S.cur = null; S.q = '';
   if (S.fb) {
     S.unsubs.forEach((f) => f()); S.unsubs = [];
-    Object.assign(S, { accounts: {}, companies: {}, susp: {}, manifests: {}, live: {}, scans: {}, loads: {}, trips: [], profiles: {}, profPending: {}, adminRec: null, accLoaded: false, ready: false, role0: '' });
+    Object.assign(S, { accounts: {}, companies: {}, susp: {}, manifests: {}, live: {}, scans: {}, loads: {}, trips: [], profiles: {}, profPending: {}, adminRec: null, accLoaded: false, ready: false, role0: '', code0: '', uname0: '', bOk: false });
     fbAuth.signOut().catch(() => {});
   }
   S.auth = { view: 'home', role: 'dispatch', mode: 'login' };
@@ -456,7 +486,7 @@ function logout() {
 async function startFb(uid) {
   const d = await S.db.doc('accounts/' + uid).get();
   if (!d.exists) throw new Error('This login has no Corridor profile.');
-  S.role0 = d.data().role;
+  S.role0 = d.data().role; S.code0 = d.data().companyCode || ''; S.uname0 = d.data().username || ''; S.bOk = false;
   startSession(uid);
   listen();
 }
@@ -529,7 +559,8 @@ async function doSignup() {
       post = () => S.db.doc(`data/users/${uid}/profile`).set({ nrc, phone, licenceNo, passportNo });
       flash = 'Driver profile created. Your dispatcher can now add you to trips.';
     } else if (role === 'border') {
-      flash = 'Border officer account created.';
+      if (S.fb) acct.approved = false;
+      flash = S.fb ? 'Border officer account created. An admin must approve it before you can scan.' : 'Border officer account created.';
     }
     if (!S.fb) { const salt = rnd(16, 'abcdef0123456789'); await S.db.doc('creds/' + user).set({ uid, salt, hash: await hashPw(salt, pw) }); }
     await pre();
@@ -546,8 +577,9 @@ async function doSignup() {
 // ---------- trips list ----------
 function tripCard(t) {
   const cps = (t.checkpoints || []).length, total = (ROUTES[t.route] || []).length, live = liveFor(t.id);
+  const stLine = t.lastStatus ? `<div class="meta"><b>${esc(t.lastStatus.text)}</b> · ${ago(t.lastStatus.at)}</div>` : '';
   const liveLine = live ? `<div class="meta">Live ${Number(live.lat).toFixed(4)}, ${Number(live.lng).toFixed(4)}, ${ago(live.at)}</div>` : '';
-  return `<article class="card trip" data-act="open" data-id="${esc(t.id)}"><div class="row"><span class="chip ${esc(t.status)}">${esc(STATUS[t.status] || t.status)}</span><span class="mono">${esc(t.id.slice(0, 12))}</span></div><h3>${esc(String(t.route).toUpperCase().replace(' TO ', ' → '))}</h3><div class="meta">${esc(t.truck && t.truck.reg)} · ${esc(t.driver && t.driver.name)} · ${esc(t.cargo && t.cargo.description)}</div><div class="meta">${cps}/${total} checkpoints${t.reference ? ' · Ref ' + esc(t.reference) : ''}</div>${liveLine}</article>`;
+  return `<article class="card trip" data-act="open" data-id="${esc(t.id)}"><div class="row"><span class="chip ${esc(t.status)}">${esc(STATUS[t.status] || t.status)}</span><span class="mono">${esc(t.id.slice(0, 12))}</span></div><h3>${esc(String(t.route).toUpperCase().replace(' TO ', ' → '))}</h3><div class="meta">${esc(t.truck && t.truck.reg)} · ${esc(t.driver && t.driver.name)} · ${esc(t.cargo && t.cargo.description)}</div><div class="meta">${cps}/${total} checkpoints${t.reference ? ' · Ref ' + esc(t.reference) : ''}</div>${stLine}${liveLine}</article>`;
 }
 function tripListHTML() {
   const q = S.q.trim().toLowerCase();
@@ -558,12 +590,28 @@ function tripListHTML() {
   });
   return list.map(tripCard).join('') || '<p class="muted">No trips match this view.</p>';
 }
+function summaryCard(list) {
+  if (!['admin', 'dispatch'].includes(myRole())) return '';
+  const active = list.filter((t) => ['planned', 'on_road', 'at_border'].includes(t.status));
+  const stat = list.map((t) => ({ t, f: fuelStats(t.fuel) }));
+  const litres = stat.reduce((n, x) => n + x.f.litres, 0), cost = stat.reduce((n, x) => n + x.f.cost, 0);
+  const km = stat.reduce((n, x) => n + x.f.km, 0), used = stat.reduce((n, x) => n + (x.f.km > 0 ? x.f.f.slice(1).reduce((m, e) => m + e.litres, 0) : 0), 0);
+  const fleet = km > 0 && used > 0 ? km / used : 0;
+  const high = stat.filter((x) => fleet && x.f.kpl && x.f.kpl < fleet * 0.7);
+  const latest = active.filter((t) => t.lastStatus).sort((a, b) => ms(b.lastStatus.at) - ms(a.lastStatus.at)).slice(0, 5);
+  const rows = latest.map((t) => `<div class="item trip" data-act="open" data-id="${esc(t.id)}"><span class="dt">${ago(t.lastStatus.at)}</span><span style="flex:1"><b>${esc(t.truck && t.truck.reg)}</b>: ${esc(t.lastStatus.text)}</span></div>`).join('');
+  return `<h2>Fleet summary</h2>
+  <div class="tiles"><div class="tile"><b>${active.length}</b><span>Active trips</span></div><div class="tile"><b>${fleet ? fleet.toFixed(2) : '—'}</b><span>Fleet km per litre</span></div><div class="tile"><b>${fmtN(litres)}</b><span>Litres bought</span></div><div class="tile"><b>${cost ? fmtN(cost) : '—'}</b><span>Fuel cost (ZMW)</span></div></div>
+  ${high.length ? notice('High fuel use: ' + high.map((x) => `${x.t.truck && x.t.truck.reg} (${x.f.kpl.toFixed(2)} km/L)`).join(', ') + '. Fleet average is ' + fleet.toFixed(2) + ' km/L.', 'warn') : ''}
+  ${rows ? `<div class="eyebrow">Latest from drivers</div>${rows}` : '<p class="muted">No driver status updates yet.</p>'}`;
+}
 function viewTrips() {
   const list = visibleTrips(), c = (s) => list.filter((t) => t.status === s).length;
   const eyebrow = myRole() === 'dispatch' ? companyName(myCode()) || 'Your company' : 'Fleet operations';
   const isBorder = myRole() === 'border';
   return `<div class="eyebrow">${esc(eyebrow)}</div><h1>Trips</h1>
   <div class="tiles"><div class="tile"><b>${c('on_road')}</b><span>On the road</span></div><div class="tile"><b>${c('at_border')}</b><span>At a border</span></div><div class="tile"><b>${c('delivered')}</b><span>Delivered</span></div><div class="tile"><b>${c('planned')}</b><span>Planned</span></div></div>
+  ${summaryCard(list)}
   ${isBorder ? '' : '<button class="btn wide" data-act="tab" data-v="new">Start a new trip</button>'}
   ${can('check') ? '<button class="btn ghost wide" data-act="tab" data-v="scan">Scan a QR code</button>' : ''}
   <div class="seg">${[['active', 'Active'], ['at_border', 'At border'], ['delivered', 'Delivered'], ['all', 'All']].map(([k, l]) => `<button data-act="filter" data-v="${k}" class="${S.filter === k ? 'on' : ''}">${l}</button>`).join('')}</div>
@@ -670,7 +718,7 @@ async function createTrip() {
   const companyCode = myRole() === 'admin' ? d.companyCode : myCode();
   const driverUid = myRole() === 'driver' ? S.uid : (d.driverUid || null);
   const trip = {
-    companyCode, createdBy: S.uid, createdByRole: myRole(), driverUid, status: 'planned', route: d.route,
+    companyCode, companyName: companyName(companyCode) || '', createdBy: S.uid, createdByRole: myRole(), driverUid, status: 'planned', route: d.route,
     truck: { reg: up(d.reg), trailer: up(d.trailer) },
     driver: { name: d.driverName.trim(), nrc: d.nrc.trim(), phone: d.phone.trim(), licenceNo: d.licenceNo.trim(), passportNo: String(d.passportNo || '').trim() },
     cargo: { description: d.cargo.trim(), hs: String(d.hs || '').trim(), weight: Number(d.weight) || 0, value: Number(d.value) || 0, dangerous: !!d.dangerous, un: d.dangerous ? String(d.un || '').trim() : '' },
@@ -692,8 +740,8 @@ function viewDetail() {
   const stops = ROUTES[t.route] || [], cps = t.checkpoints || [];
   const mine = myRole() === 'driver' && t.driverUid === S.uid;
   const canLog = can('log') && (myRole() !== 'driver' || mine);
-  const tabs = `<div class="seg"><button data-act="dtab" data-v="track" class="${S.detailTab === 'track' ? 'on' : ''}">Tracking</button><button data-act="dtab" data-v="manifest" class="${S.detailTab === 'manifest' ? 'on' : ''}">Manifest</button><button data-act="dtab" data-v="details" class="${S.detailTab === 'details' ? 'on' : ''}">Details</button><button data-act="dtab" data-v="docs" class="${S.detailTab === 'docs' ? 'on' : ''}">Documents</button></div>`;
-  const body = S.detailTab === 'manifest' ? manifestPane(t) : S.detailTab === 'details' ? detailsPane(t) : S.detailTab === 'docs' ? docsPane(t) : trackPane(t, stops, cps, mine, canLog);
+  const tabs = `<div class="seg five"><button data-act="dtab" data-v="track" class="${S.detailTab === 'track' ? 'on' : ''}">Tracking</button><button data-act="dtab" data-v="manifest" class="${S.detailTab === 'manifest' ? 'on' : ''}">Manifest</button><button data-act="dtab" data-v="details" class="${S.detailTab === 'details' ? 'on' : ''}">Details</button><button data-act="dtab" data-v="docs" class="${S.detailTab === 'docs' ? 'on' : ''}">Docs</button><button data-act="dtab" data-v="fuel" class="${S.detailTab === 'fuel' ? 'on' : ''}">Fuel</button></div>`;
+  const body = S.detailTab === 'manifest' ? manifestPane(t) : S.detailTab === 'details' ? detailsPane(t) : S.detailTab === 'docs' ? docsPane(t) : S.detailTab === 'fuel' ? fuelPane(t, canLog) : trackPane(t, stops, cps, mine, canLog);
   const events = (t.events || []).slice(-8).reverse().map((e) => `<div class="item"><span class="dt">${fmtTime(e.at)}</span><span>${esc(e.text)}</span></div>`).join('') || '<p class="muted">Nothing logged yet.</p>';
   return `<button class="link" data-act="tab" data-v="${myRole() === 'driver' ? 'truck' : 'trips'}">Back</button>
     <div class="eyebrow">${esc(t.truck && t.truck.reg)} · ${esc(t.clearance)}</div><h1>${esc(String(t.route).toUpperCase().replace(' TO ', ' → '))}</h1>
@@ -712,7 +760,7 @@ function trackPane(t, stops, cps, mine, canLog) {
     return `<div class="stop ${done ? 'done' : nx ? 'next' : ''}"><span>${done ? '✓' : i + 1}</span><div><b>${esc(s)}</b><small>${done ? fmtTime(cps[i].at) : nx ? 'Next stop' : 'Still to come'}</small></div></div>`;
   }).join('')}</div>`;
   const share = can('share') ? `<button class="btn wide line" data-act="shareStatus" data-v="${esc(t.id)}">Send status to customer on WhatsApp</button>` : '';
-  return gps + share + log + podPane(t, canLog) + list;
+  return gps + statusPane(t, canLog) + share + log + podPane(t, canLog) + list;
 }
 function detailsPane(t) {
   const d = t.driver || {}, c = t.cargo || {}, k = t.truck || {};
@@ -723,7 +771,7 @@ function detailsPane(t) {
   return `<h2>Driver</h2>${row('Name', d.name)}${row('NRC', d.nrc)}${row('Phone', d.phone)}${row('Licence no.', d.licenceNo)}${row('Passport no.', d.passportNo)}
     <h2>Truck</h2>${row('Registration', k.reg)}${row('Trailer', k.trailer)}
     <h2>Cargo</h2>${row('Description', c.description)}${row('HS code', c.hs)}${row('Weight (kg)', fmtN(c.weight))}${row('Value (USD)', fmtN(c.value))}${row('Dangerous goods', c.dangerous ? 'Yes, UN ' + c.un : 'No')}
-    <h2>Trip</h2>${row('Company', companyName(t.companyCode) + ' (' + t.companyCode + ')')}${row('Route', t.route)}${row('Clearance', t.clearance)}${row('Reference', t.reference)}${row('Departure', fmtDate(t.departure))}${row('Created by', creator ? creator.name + ' (' + (ROLE_NAME[creator.role] || creator.role) + ')' : '')}${row('Created', fmtTime(t.createdAt))}
+    <h2>Trip</h2>${row('Company', (t.companyName || companyName(t.companyCode)) + ' (' + t.companyCode + ')')}${row('Route', t.route)}${row('Clearance', t.clearance)}${row('Reference', t.reference)}${row('Departure', fmtDate(t.departure))}${row('Created by', creator ? creator.name + ' (' + (ROLE_NAME[creator.role] || creator.role) + ')' : '')}${row('Created', fmtTime(t.createdAt))}
     <h2>Documents</h2>${docs}`;
 }
 function manifestPane(t) {
@@ -748,7 +796,7 @@ async function issueManifest(t, msg) {
     issuedAt: n.toISOString(), validUntil: new Date(end).toISOString()
   });
   const hash = await sha256(payload);
-  await write(() => S.db.doc('manifests/' + t.id).set({ payload, hash, status: 'valid', issuedAt: n.toISOString(), validUntil: JSON.parse(payload).validUntil, by: S.uid }), msg || 'QR code issued. Show it at the border.');
+  await write(() => S.db.doc('manifests/' + t.id).set({ payload, hash, status: 'valid', issuedAt: n.toISOString(), validUntil: JSON.parse(payload).validUntil, by: S.uid, companyCode: t.companyCode }), msg || 'QR code issued. Show it at the border.');
 }
 async function logCheckpoint(id) {
   const t = S.trips.find((x) => x.id === id);
@@ -781,10 +829,18 @@ const CARGO = [
   ['General', [['Containers (loaded)', ''], ['Mixed or general cargo', '']]]
 ];
 const BIZ = { name: 'Corridor Freight Management', phone: '+260 76 799 2911', tel: '+260767992911', email: 'lubutochama16@gmail.com' };
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); S.installEv = e; });
+const isStandalone = () => window.__installed === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const installCard = () => isStandalone() ? '' : `<div class="card"><div class="row"><div style="flex:1;min-width:180px"><b>Install Corridor</b><div class="meta">Opens like an app and works offline.</div></div><button class="btn" data-act="install">Install</button></div></div>`;
 function infoHTML(k) {
   const back = '<button class="link" data-act="infoClose">Back to the app</button>';
   const sec = (h, t) => `<h2>${h}</h2><p>${t}</p>`;
+  if (k === 'install') {
+    const steps = isIOS()
+      ? ['Open this page in Safari.', 'Tap the Share button (the square with an arrow).', 'Scroll down and tap Add to Home Screen.', 'Tap Add. Corridor appears on your home screen.']
+      : ['If you opened this link from WhatsApp or another app, tap the three dots and choose Open in Chrome first.', 'In Chrome, tap the three dots at the top right.', 'Tap Install app, or Add to Home screen.', 'Tap Install. Corridor appears with your apps.'];
+    return `${back}<div class="eyebrow">Install</div><h1>Add Corridor to this phone</h1><p class="muted">Your browser did not offer a one-tap install, so follow these steps once.</p><div class="card">${steps.map((x, i) => `<div class="stop"><span>${i + 1}</span><div>${esc(x)}</div></div>`).join('')}</div>`;
+  }
   if (k === 'contact') return `${back}<div class="eyebrow">Get in touch</div><h1>Contact</h1><div class="card"><b>${BIZ.name}</b><p class="meta">Zambia</p>
     <p><a class="link" href="tel:${BIZ.tel}">Call ${BIZ.phone}</a><br><a class="link" target="_blank" rel="noopener" href="https://wa.me/${BIZ.tel.replace('+', '')}">Message on WhatsApp</a><br><a class="link" href="mailto:${BIZ.email}">${BIZ.email}</a></p></div>
     <p class="muted">Questions, support, feedback or a request to delete your data: reach out on any of the above.</p>`;
@@ -798,8 +854,8 @@ function infoHTML(k) {
   return `${back}<div class="eyebrow">About</div><h1>${BIZ.name}</h1>
     ${sec('What it does', 'Corridor gives every cross-border freight trip a digital manifest with a QR code. Transport companies record the trip once. Border officers scan the code to see at once if it is valid, expired, cancelled or edited. The app also tracks trucks, finds backhaul loads, records proof of delivery and prepares delivery documents.')}
     ${sec('What it is not', 'Corridor supplements official border and customs processes. It does not replace any declaration, and it is not an official system of the Zambia Revenue Authority unless ZRA says so.')}
-    ${sec('Version', 'v1.0')}
-    ${S.installEv ? '<button class="btn wide" data-act="install">Install the app on this phone</button>' : '<p class="muted">To install: open the browser menu and choose Add to Home screen.</p>'}
+    ${sec('Version', 'v1.2')}
+    ${isStandalone() ? '<p class="muted">Corridor is installed on this phone.</p>' : '<button class="btn wide" data-act="install">Install the app on this phone</button>'}
     <button class="btn wide line" data-act="info" data-v="contact">Contact us</button>`;
 }
 function podPane(t, canLog) {
@@ -847,6 +903,103 @@ async function savePod(id) {
   const pod = { name, phone: val('#pod-phone').length > 5 ? val('#pod-phone') : '', note: val('#pod-note'), sig: $('#sig').toDataURL('image/png'), photo, at, by, lat: pos ? pos.coords.latitude : null, lng: pos ? pos.coords.longitude : null };
   await write(() => S.db.doc('trips/' + id).update({ pod, events: [...(t.events || []), { at, by, text: 'Delivery verified. Received by ' + name }], updatedAt: at }), 'Delivery verified. Your documents are ready.');
   S.detailTab = 'docs';
+}
+
+// ---------- status to the boss, fuel log ----------
+const ordinal = (n) => { const x = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (x[(v - 20) % 10] || x[v] || x[0]); };
+const getBoss = () => { try { return localStorage.getItem(BOSS_KEY) || ''; } catch (e) { return ''; } };
+function waNum(raw) {
+  const d = String(raw || '').replace(/\D/g, '');
+  if (d.length <= 3) return '';
+  if (d.startsWith('260') && d.length === 12) return d;
+  if (d.startsWith('0') && d.length === 10) return '260' + d.slice(1);
+  if (d.length === 9) return '260' + d;
+  return d.length >= 11 && d.length <= 15 && !d.startsWith('0') ? d : null;
+}
+function statusPane(t, canLog) {
+  const ls = t.lastStatus;
+  const last = ls ? `<p class="meta">Last status: <b>${esc(ls.text)}</b>, ${ago(ls.at)}${ls.by ? ' by ' + esc(ls.by) : ''}.</p>` : '';
+  if (!canLog) return ls ? `<div class="card"><b>Latest status</b>${last}</div>` : '';
+  const btns = QS.map(([k, l]) => `<button class="btn ${k === 'trouble' ? 'ghost danger' : 'ghost'}" data-act="bossStatus" data-v="${esc(t.id)}" data-k="${k}">${esc(l)}</button>`).join('');
+  return `<div class="card"><b>Tell the boss</b>
+    <p class="muted">Tap a status. WhatsApp opens with the message ready. Press send there.</p>
+    <label class="field"><span>Boss WhatsApp number</span><input id="qs-phone" type="tel" inputmode="tel" placeholder="+260 97 123 4567" data-fmt="phone" value="${esc(getBoss())}"></label>
+    <label class="field"><span>Place in the queue (for “In queue”)</span><input id="qs-num" type="number" inputmode="numeric" min="1" placeholder="10" value="${esc(S.qnum || '')}"></label>
+    <div class="stbtns">${btns}</div>${last}</div>`;
+}
+function bossStatus(id, k) {
+  const t = S.trips.find((x) => x.id === id), q = QS.find((x) => x[0] === k);
+  if (!t || !q) return;
+  const num = parseInt(val('#qs-num'), 10), raw = val('#qs-phone'), wa = waNum(raw);
+  S.qnum = val('#qs-num');
+  if (k === 'queue' && !(num > 0)) throw new Error('Type your place in the queue first, for example 10.');
+  if (wa === null) throw new Error('Check the boss number. Use the form +260 97 123 4567.');
+  try { localStorage.setItem(BOSS_KEY, wa ? raw : ''); } catch (e) {}
+  const text = k === 'queue' ? ordinal(num) + ' in queue' : q[2];
+  const cps = t.checkpoints || [], stops = ROUTES[t.route] || [], live = liveFor(id), at = now(), by = me() ? me().name : 'Admin';
+  const msg = `Corridor status\n${text}\nTruck ${t.truck && t.truck.reg}, ${t.route}`
+    + `\nLast checkpoint: ${cps.length ? cps[cps.length - 1].name + ' (' + fmtTime(cps[cps.length - 1].at) + ')' : 'not left yet'}`
+    + (stops[cps.length] ? `\nNext: ${stops[cps.length]}` : '')
+    + (live ? `\nPosition (${ago(live.at)}): https://www.google.com/maps?q=${live.lat},${live.lng}` : '')
+    + `\nSent ${fmtTime(at)}${t.driver && t.driver.name ? ' by ' + t.driver.name : ''}`;
+  // open WhatsApp first, in the same tap, so the phone does not block it
+  const w = window.open('https://wa.me/' + wa + '?text=' + encodeURIComponent(msg), '_blank');
+  if (!w) toast('Pop-up blocked. Allow pop-ups for this site, then tap again.');
+  return write(() => S.db.doc('trips/' + id).update({ lastStatus: { k, text, at, by }, events: [...(t.events || []), { at, by, text: 'Status to boss: ' + text }], updatedAt: at }), 'Status saved. Press send in WhatsApp.');
+}
+const shrinkTo = (f, max, q) => new Promise((res) => {
+  const im = new Image(), u = URL.createObjectURL(f);
+  im.onload = () => { const k = Math.min(1, max / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL('image/jpeg', q)); };
+  im.onerror = () => res(''); im.src = u;
+});
+function fuelStats(list) {
+  const f = (list || []).slice().sort((a, b) => a.odo - b.odo);
+  const litres = f.reduce((n, x) => n + x.litres, 0), cost = f.reduce((n, x) => n + (x.cost || 0), 0);
+  const km = f.length > 1 ? f[f.length - 1].odo - f[0].odo : 0;
+  const used = f.slice(1).reduce((n, x) => n + x.litres, 0);
+  const kpl = km > 0 && used > 0 ? km / used : 0;
+  const seg = f.map((x, i) => (i ? (x.odo - f[i - 1].odo) / x.litres : null));
+  return { f, litres, cost, km, kpl, seg };
+}
+function fuelPane(t, canLog) {
+  const st = fuelStats(t.fuel), u = S.fu || {};
+  const tiles = `<div class="tiles"><div class="tile"><b>${fmtN(st.litres)}</b><span>Litres bought</span></div><div class="tile"><b>${st.kpl ? st.kpl.toFixed(2) : '—'}</b><span>km per litre</span></div><div class="tile"><b>${st.km ? fmtN(st.km) : '—'}</b><span>km driven</span></div><div class="tile"><b>${st.cost ? fmtN(st.cost) : '—'}</b><span>Fuel cost (ZMW)</span></div></div>`;
+  const rows = st.f.slice().reverse().map((x, ri) => {
+    const i = st.f.length - 1 - ri, k = st.seg[i], odd = st.f.length >= 3 && st.kpl && k !== null && k < st.kpl * 0.7;
+    return `<div class="item">${x.photo ? `<img class="rcpt" src="${x.photo}" alt="Receipt">` : ''}<span class="dt">${fmtTime(x.at)}</span><span style="flex:1">${fmtN(x.litres)} L at ${fmtN(x.odo)} km${x.place ? ', ' + esc(x.place) : ''}${x.cost ? ', ZMW ' + fmtN(x.cost) : ''}</span>${k !== null ? `<span class="chip ${odd ? 'cancelled' : 'delivered'}">${odd ? 'Check: ' : ''}${k.toFixed(2)} km/L</span>` : ''}</div>`;
+  }).join('') || '<p class="muted">No fuel logged yet.</p>';
+  const note = st.f.length >= 3 && st.f.some((x, i) => st.seg[i] !== null && st.seg[i] < st.kpl * 0.7) ? notice('A fill-up used much more fuel than the trip average. Check it for a leak, theft or a wrong reading.', 'warn') : '';
+  const form = canLog ? `<div class="card"><b>Log a fill-up</b><p class="muted">Fill the tank to full each time so km per litre is accurate.</p>
+    <label class="field"><span>Litres put in<i class="req">*</i></span><input id="fu-l" type="number" inputmode="decimal" min="0" value="${esc(u.l || '')}"></label>
+    <label class="field"><span>Odometer now (km)<i class="req">*</i></span><input id="fu-o" type="number" inputmode="numeric" min="0" value="${esc(u.o || '')}"></label>
+    <label class="field"><span>Total cost (ZMW, optional)</span><input id="fu-c" type="number" inputmode="decimal" min="0" value="${esc(u.c || '')}"></label>
+    <label class="field"><span>Where (optional)</span><input id="fu-p" type="text" maxlength="60" placeholder="Kapiri Mposhi" value="${esc(u.p || '')}"></label>
+    <label class="field"><span>Receipt photo (optional)</span><input id="fu-ph" type="file" accept="image/*" capture="environment"></label>
+    <button class="btn wide" data-act="saveFuel" data-v="${esc(t.id)}">Save fill-up</button></div>` : '';
+  const del = canLog && st.f.length ? `<button class="link danger" data-act="delFuel" data-v="${esc(t.id)}">Remove the last entry</button>` : '';
+  return tiles + note + form + `<h2>Fill-ups</h2>${rows}${del}`;
+}
+async function saveFuel(id) {
+  const t = S.trips.find((x) => x.id === id); if (!t) return;
+  S.fu = { l: val('#fu-l'), o: val('#fu-o'), c: val('#fu-c'), p: val('#fu-p') };
+  const litres = Number(S.fu.l), odo = Number(S.fu.o), cost = S.fu.c === '' ? 0 : Number(S.fu.c);
+  if (!(litres > 0 && litres <= 2000)) throw new Error('Enter the litres put in the tank.');
+  if (!(odo > 0)) throw new Error('Enter the odometer reading in km.');
+  if (!(cost >= 0)) throw new Error('The cost cannot be negative.');
+  const prev = (t.fuel || []).reduce((m, x) => Math.max(m, x.odo), 0);
+  if (odo < prev) throw new Error('The odometer is lower than the last entry (' + fmtN(prev) + ' km). Check the number.');
+  const file = $('#fu-ph') && $('#fu-ph').files[0];
+  const at = now(), by = me() ? me().name : 'Admin';
+  const entry = { at, by, litres, cost, odo, place: S.fu.p.slice(0, 60), photo: file ? await shrinkTo(file, 480, 0.5) : '' };
+  if (entry.photo && JSON.stringify(t).length + JSON.stringify(entry).length > 900000) { entry.photo = ''; toast('The trip record is nearly full, so the receipt photo was not saved.'); }
+  await write(() => S.db.doc('trips/' + id).update({ fuel: [...(t.fuel || []), entry], events: [...(t.events || []), { at, by, text: 'Fuel: ' + fmtN(litres) + ' L at ' + fmtN(odo) + ' km' }], updatedAt: at }), 'Fill-up saved.');
+  S.fu = null;
+}
+async function delFuel(id) {
+  const t = S.trips.find((x) => x.id === id); if (!t || !(t.fuel || []).length) return;
+  if (!confirm('Remove the last fuel entry?')) return;
+  const at = now(), by = me() ? me().name : 'Admin';
+  await write(() => S.db.doc('trips/' + id).update({ fuel: t.fuel.slice(0, -1), events: [...(t.events || []), { at, by, text: 'Fuel entry removed' }], updatedAt: at }), 'Last fuel entry removed.');
 }
 function shareStatus(id) {
   const t = S.trips.find((x) => x.id === id); if (!t) return;
@@ -938,7 +1091,7 @@ async function pushGps(p) {
   const n = Date.now();
   if (n - S.gps.last < 30000 || !S.gps.trip) return;
   S.gps.last = n;
-  await S.db.doc('live/' + S.uid).set({ tripId: S.gps.trip, lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy || 0), at: now() });
+  await S.db.doc('live/' + S.uid).set({ tripId: S.gps.trip, lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy || 0), at: now(), companyCode: myCode() });
 }
 function viewTruck() {
   const mine = S.trips.filter((t) => t.driverUid === S.uid);
@@ -1088,7 +1241,7 @@ async function checkQR(text) {
 function viewControl() {
   const open = S.sys.open !== false;
   const companies = Object.values(S.companies).map((c) => `<div class="item"><div style="flex:1"><b>${esc(c.name)}</b><div class="meta">Code ${esc(c.code)}</div></div><span class="chip ${S.susp['co_' + c.code] ? 'cancelled' : 'delivered'}">${S.susp['co_' + c.code] ? 'Shut down' : 'Open'}</span><button class="link" data-act="suspendCo" data-v="${esc(c.code)}">${S.susp['co_' + c.code] ? 'Reopen' : 'Shut down'}</button></div>`).join('') || '<p class="muted">No companies yet.</p>';
-  const accounts = Object.entries(S.accounts).filter(([id, a]) => a.role !== 'admin' && id !== S.uid).map(([id, a]) => `<div class="item"><div style="flex:1"><b>${esc(a.name)}</b><div class="meta">${esc(ROLE_NAME[a.role] || a.role)}${a.companyCode ? ' · ' + esc(a.companyCode) : ''}</div></div><button class="link" data-act="suspendUser" data-v="${esc(id)}">${S.susp['user_' + id] ? 'Enable' : 'Disable'}</button></div>`).join('') || '<p class="muted">No other accounts yet.</p>';
+  const accounts = Object.entries(S.accounts).filter(([id, a]) => a.role !== 'admin' && id !== S.uid).map(([id, a]) => `<div class="item"><div style="flex:1"><b>${esc(a.name)}</b><div class="meta">${esc(ROLE_NAME[a.role] || a.role)}${a.companyCode ? ' · ' + esc(a.companyCode) : ''}${S.fb && a.role === 'border' && a.approved !== true ? ' · waiting for approval' : ''}</div></div>${S.fb && a.role === 'border' && a.approved !== true ? `<button class="link" data-act="approve" data-v="${esc(id)}">Approve</button>` : ''}<button class="link" data-act="suspendUser" data-v="${esc(id)}">${S.susp['user_' + id] ? 'Enable' : 'Disable'}</button></div>`).join('') || '<p class="muted">No other accounts yet.</p>';
   return `<div class="eyebrow">Admin</div><h1>Control</h1>
   <div class="card"><div class="row"><b>Whole system</b><span class="chip ${open ? 'delivered' : 'cancelled'}">${open ? 'Open' : 'Shut down'}</span></div>
     <button class="btn wide ${open ? 'danger' : ''}" data-act="system">${open ? 'Shut down the whole system' : 'Reopen the system'}</button>
@@ -1130,9 +1283,22 @@ async function act(a, b) {
     case 'dtab': S.detailTab = b.dataset.v; return;
     case 'info': S.info = b.dataset.v; window.scrollTo(0, 0); return;
     case 'infoClose': S.info = null; window.scrollTo(0, 0); return;
-    case 'install': if (S.installEv) { S.installEv.prompt(); S.installEv = null; } return;
+    case 'install': {
+      const ev = window.__bip;
+      if (ev) {
+        ev.prompt(); // must run in the same tap
+        window.__bip = null;
+        const r = await ev.userChoice.catch(() => null);
+        if (r && r.outcome === 'accepted') toast('Installing Corridor. Look for it on your home screen.');
+        return;
+      }
+      S.info = 'install'; window.scrollTo(0, 0); return;
+    }
     case 'savePod': return savePod(b.dataset.v);
     case 'shareStatus': shareStatus(b.dataset.v); return;
+    case 'bossStatus': return bossStatus(b.dataset.v, b.dataset.k);
+    case 'saveFuel': return saveFuel(b.dataset.v);
+    case 'delFuel': return delFuel(b.dataset.v);
     case 'doc': return openDoc(b.dataset.v, b.dataset.id);
     case 'postLoad': return postLoad();
     case 'claimLoad': return write(() => S.db.doc('loads/' + b.dataset.v).update({ status: 'claimed', claimedBy: S.uid, claimedName: me() ? me().name : '', claimedCompany: companyName(myCode()), claimedAt: now() }), 'Load claimed. Call the poster to agree the details.');
@@ -1183,6 +1349,7 @@ async function act(a, b) {
       const key = 'co_' + id, on = !!S.susp[key];
       return write(() => (on ? S.db.doc('suspensions/' + key).delete() : S.db.doc('suspensions/' + key).set({ at: now() })), on ? 'Company reopened.' : 'Company shut down.');
     }
+    case 'approve': return write(() => S.db.doc('accounts/' + id).update({ approved: true }), 'Border officer approved.');
     case 'suspendUser': {
       const key = 'user_' + id, on = !!S.susp[key];
       return write(() => (on ? S.db.doc('suspensions/' + key).delete() : S.db.doc('suspensions/' + key).set({ at: now() })), on ? 'Account enabled.' : 'Account disabled.');

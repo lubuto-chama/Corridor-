@@ -1,4 +1,5 @@
 {
+ "id": "./",
  "name": "Corridor Freight Management",
  "short_name": "Corridor",
  "description": "Digital trip manifests and QR checks for cross-border freight.",
@@ -26,5 +27,10 @@
    "type": "image/png",
    "purpose": "maskable"
   }
+ ],
+ "lang": "en",
+ "categories": [
+  "business",
+  "productivity"
  ]
 }

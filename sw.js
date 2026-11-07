@@ -1,5 +1,5 @@
 // Corridor Freight: caches the app so it opens with no connection.
-const CACHE = 'corridor-v2';
+const CACHE = 'corridor-v3';
 const PRECACHE = [
   './',
   'manifest.webmanifest',
